@@ -1,8 +1,9 @@
 -module(main).
+
 -compile(export_all).
 
 main(Args) ->
-    [K, N_Nodes | Nodes ] = Args,
+    [K, N_Nodes | Nodes] = Args,
     Prefix =
         lists:concat(
             lists:duplicate(K, "0")),
@@ -20,7 +21,6 @@ main(Args) ->
 
 print_coins(100) ->
     ok;
-
 print_coins(Coins_found) ->
     receive
         {Hash, String, Finder} ->
@@ -31,9 +31,8 @@ print_coins(Coins_found) ->
 spawn_many(0, _, _) ->
     ok;
 spawn_many(N, Prefix, Node) ->
-        spawn(Node, main, find_token, [Prefix, self()]),
-        spawn_many(N - 1, Prefix, Node).
-
+    spawn(Node, main, find_token, [Prefix, self()]),
+    spawn_many(N - 1, Prefix, Node).
 
 find_token(Prefix, Parent) ->
     String = generate_random_string(),

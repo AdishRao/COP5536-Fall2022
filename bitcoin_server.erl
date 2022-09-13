@@ -1,48 +1,33 @@
 -module(bitcoin_server).
 
 -compile(export_all).
-% -define(Coins_found, 100)
-start() ->
-    spawn(bitcoin_server, bitcoin_server, []).
 
-bitcoin_server() ->
-    receive
-        {Client, Args} ->
+start(K , N_Nodes) ->
+    Prefix = lists:concat(lists:duplicate(K, "0")),
+    io:fwrite("String : ~p ~p\n", [K, Prefix]),
+    spawn_many(N_Nodes, Prefix, node()),
+    register(server, self()),
+    bitcoin_server(0, N_Nodes, Prefix).
 
-            [K, N_Nodes | Nodes ] = Args,
-            Prefix =
-                lists:concat(
-                    lists:duplicate(K, "0")),
-            io:fwrite("String : ~p ~p ~p\n", [K, Nodes, Prefix]),
-            [net_adm:ping(Node) || Node <- Nodes],
-            {Mod, Bin, File} = code:get_object_code(bitcoin_server),
-            rpc:multicall(code, load_binary, [Mod, File, Bin]),
-            Coins_found = 0,
-            if Nodes /= [] ->
-                [spawn_many(N_Nodes, Prefix, Node) || Node <- Nodes];
-            true ->
-                ok
-            end,
-            spawn_many(N_Nodes, Prefix, node()),
-            Client ! {self(), print_coins(Coins_found)}
-    end,
-    bitcoin_server().
-
-print_coins(100) ->
+bitcoin_server(100, _, _) ->
     ok;
-
-print_coins(Coins_found) ->
+bitcoin_server(Coins_found, N_Nodes, Prefix) ->
     receive
         {Hash, String, Finder} ->
             io:fwrite("Coin ~p and Hash ~p Found by ~p\n\n", [String, Hash, Finder]),
-            New_coin_count = increment_coins_found(Coins_found),
-            print_coins(New_coin_count)
+            Finder ! {mine},
+            bitcoin_server(Coins_found+1, N_Nodes, Prefix);
+        {node, Node} ->
+            io:fwrite("Spawning on Node: ~p\n", [Node]),
+            send_code(Node),
+            spawn_many(N_Nodes, Prefix, Node),
+            bitcoin_server(Coins_found, N_Nodes, Prefix)
     end.
 
-increment_coins_found(Coins_found) ->
-    New_coin_count = Coins_found + 1,
-    New_coin_count.
-
+send_code(Node) ->
+    {Mod, Bin, File} = code:get_object_code(bitcoin_server),
+    rpc:multicall([Node], code, load_binary, [Mod, File, Bin]),
+    ok.
 
 spawn_many(0, _, _) ->
     ok;
@@ -56,11 +41,17 @@ find_token(Prefix, Parent) ->
     Hash = calculate_hash(String),
     Coin = string:find(Hash, Prefix) =:= Hash,
     if Coin == true ->
-           Parent ! {Hash, String, self()};
-       true ->
-           ok
-    end,
-    find_token(Prefix, Parent).
+           Parent ! {Hash, String, self()},
+           receive
+                {mine} ->
+                    find_token(Prefix, Parent)
+            after
+                10000 ->
+                    ok
+            end;
+    true ->
+        find_token(Prefix, Parent)
+    end.
 
 calculate_hash(String) ->
     Hash =

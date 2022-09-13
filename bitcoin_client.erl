@@ -1,10 +1,6 @@
 -module(bitcoin_client).
--export([start/2]).
+-export([start/1]).
 
-start(Server, Args)->
-    Server ! {self(), {Args}},
-    receive
-        {Server, Result}->
-            Result
-    end.
-
+start(Server_node)->
+    net_adm:ping(Server_node),
+    {server, Server_node} ! {node, node()}.

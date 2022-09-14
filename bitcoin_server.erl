@@ -7,7 +7,13 @@ start(K , N_Nodes) ->
     io:fwrite("String : ~p ~p\n", [K, Prefix]),
     spawn_many(N_Nodes, Prefix, node()),
     register(server, self()),
-    bitcoin_server(0, N_Nodes, Prefix).
+    statistics(runtime),
+    {Time, _} = timer:tc(bitcoin_server, bitcoin_server, [0, N_Nodes, Prefix]),
+    {_, Time_CPU_Since_Last_Call} = statistics(runtime),
+    io:fwrite("Total clock time: ~p\nToal CPU time ~p\n CPU time/ Run Time ~p\n", [Time/1000, Time_CPU_Since_Last_Call, Time_CPU_Since_Last_Call/(Time/1000)]).
+
+
+    %bitcoin_server(0, N_Nodes, Prefix).
 
 bitcoin_server(100, _, _) ->
     ok;
@@ -20,7 +26,7 @@ bitcoin_server(Coins_found, N_Nodes, Prefix) ->
         {node, Node} ->
             io:fwrite("Spawning on Node: ~p\n", [Node]),
             send_code(Node),
-            spawn_many(N_Nodes, Prefix, Node),
+            spawn(bitcoin_server, spawn_many, [N_Nodes, Prefix, Node]),
             bitcoin_server(Coins_found, N_Nodes, Prefix)
     end.
 

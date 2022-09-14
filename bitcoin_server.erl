@@ -5,7 +5,7 @@
 start(K , N_Nodes) ->
     Prefix = lists:concat(lists:duplicate(K, "0")),
     io:fwrite("String : ~p ~p\n", [K, Prefix]),
-    spawn_many(N_Nodes, Prefix, node()),
+    spawn_many(N_Nodes, Prefix, node(), self()),
     register(server, self()),
     statistics(runtime),
     {Time, _} = timer:tc(bitcoin_server, bitcoin_server, [0, N_Nodes, Prefix]),
@@ -26,7 +26,7 @@ bitcoin_server(Coins_found, N_Nodes, Prefix) ->
         {node, Node} ->
             io:fwrite("Spawning on Node: ~p\n", [Node]),
             send_code(Node),
-            spawn(bitcoin_server, spawn_many, [N_Nodes, Prefix, Node]),
+            spawn(bitcoin_server, spawn_many, [N_Nodes, Prefix, Node, self()]),
             bitcoin_server(Coins_found, N_Nodes, Prefix)
     end.
 
@@ -35,11 +35,11 @@ send_code(Node) ->
     rpc:multicall([Node], code, load_binary, [Mod, File, Bin]),
     ok.
 
-spawn_many(0, _, _) ->
+spawn_many(0, _, _, _) ->
     ok;
-spawn_many(N, Prefix, Node) ->
-        spawn(Node, bitcoin_server, find_token, [Prefix, self()]),
-        spawn_many(N - 1, Prefix, Node).
+spawn_many(N, Prefix, Node, Parent) ->
+        spawn(Node, bitcoin_server, find_token, [Prefix, Parent]),
+        spawn_many(N - 1, Prefix, Node, Parent).
 
 
 find_token(Prefix, Parent) ->

@@ -1,4 +1,4 @@
-# COP5536-Fall2022
+# Project 1
 **Group Members:**
   1. Adish Someshwar Rao 
   2. Sanjana Rao Guttalu Prasan

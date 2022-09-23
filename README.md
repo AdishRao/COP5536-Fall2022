@@ -33,15 +33,16 @@ Result for running the program on two complete different systems can be found in
 
 
 **3. Running Time:**
+The runtime was tested for finding only one coin, however, the same runtime would be obtained for any number of coins.
 
-![image](https://user-images.githubusercontent.com/31245878/190829889-1a0680e4-df18-4f62-ad8a-56290889a41c.png)
+![Runtime](https://user-images.githubusercontent.com/31245878/191872277-a77c27bd-f7af-4ac7-92ef-3f9730fc9a30.jpeg)
 Fig 3: Runtimes when run on four nodes.
   
-  Total Clock time  = 64165.23
+  Total Clock time  = 722.389
   
-  Total CPU time = 189105
+  Total CPU time = 4897
   
-  CPU time/ Run time ratio =  2.9471568947855404
+  CPU time/ Run time ratio =  6.778
   
 
 **4. Largest coin found (i.e., the coin with the most number of leading 0's)**

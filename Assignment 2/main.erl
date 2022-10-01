@@ -21,18 +21,14 @@ spawn_actors(NoNodes, line, Algo) ->
 
 send_neighbors(line, _, max, 1) ->
     exit('not enough nodes, at least 2');
-
 send_neighbors(line, PIDS, max, N) ->
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS)]},
     send_neighbors(line, PIDS, N-1).
-
 send_neighbors(line, _, 0) ->
     ok;
-
 send_neighbors(line, PIDS, 1) ->
     lists:nth(1, PIDS) ! {neighbor, [lists:nth(2 , PIDS)]},
     send_neighbors(line, PIDS, 0);
-
 send_neighbors(line, PIDS, N) ->
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), lists:nth(N + 1, PIDS)]},
     send_neighbors(line, PIDS, N-1).

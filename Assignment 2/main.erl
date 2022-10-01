@@ -41,4 +41,7 @@ start_gossip(Algo) ->
     end.
 
 gossip(MyNeighbors, gossip) ->
+    io:fwrite("I am ~p and I can talk to ~p\n\n", [self(), MyNeighbors]);
+
+gossip(MyNeighbors, pushsum) ->
     io:fwrite("I am ~p and I can talk to ~p\n\n", [self(), MyNeighbors]).

@@ -57,7 +57,73 @@ spawn_actors(NoNodes, line, Algo) ->
 spawn_actors(NoNodes, full, Algo) ->
     PIDS = spawn_many(NoNodes, Algo),
     send_neighbors(full, PIDS, max, length(PIDS)),
+    PIDS;
+
+% Spawn required number of actors for line topology and build 2d grid topology.
+spawn_actors(NoNodes, grid_2d, Algo) ->
+    % Side = floor(math:sqrt(NoNodes)),
+    PIDS = spawn_many(NoNodes, Algo),
+    send_neighbors(grid_2d, PIDS, trunc(math:sqrt(NoNodes)), NoNodes),
     PIDS.
+
+%left edge
+send_node_neighbors(1, Side, N, PIDS) ->
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), lists:nth(N + Side, PIDS), lists:nth(N - Side, PIDS)]};
+
+%right edge
+send_node_neighbors(0, Side, N, PIDS) ->
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), lists:nth(N + Side, PIDS), lists:nth(N - Side, PIDS)]};
+
+% Send node neighbors for nodes not on the edge of the 2d plane
+send_node_neighbors(_, Side, N, PIDS) ->
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), lists:nth(N + Side, PIDS), lists:nth(N + 1, PIDS), lists:nth(N - Side, PIDS) ]}.
+
+% Bottom row
+send_node_neighbors(edge, true, Side, N, 1, PIDS) ->
+    %left most node
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), lists:nth(N - Side, PIDS)]};
+
+send_node_neighbors(edge, true, Side, N, 0, PIDS) ->
+    %right most node
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), lists:nth(N - Side, PIDS)]};
+
+send_node_neighbors(edge, true, Side, N, _, PIDS) ->
+    %inner  nodes
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), lists:nth(N + 1, PIDS),lists:nth(N - Side, PIDS)]};
+
+%Top row
+send_node_neighbors(edge, false, Side, N, 1, PIDS) ->
+    %left most node
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), lists:nth(N + Side, PIDS)]};
+
+send_node_neighbors(edge, false, Side, N, 0, PIDS) ->
+    %right most node
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), lists:nth(N + Side, PIDS)]};
+
+send_node_neighbors(edge, false, Side, N, _, PIDS) ->
+    % inner node
+    lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), lists:nth(N + 1, PIDS),lists:nth(N + Side, PIDS)]}.
+
+% % Finished all nodes
+% send_node_neighbors(edge, _, Side, 0, _, PIDS) ->
+%     ok;
+
+%Finished sending neighbors in the plane
+send_neighbors(grid_2d, _, _, 0)  ->
+    ok;
+
+% Find neighbors for 2D grid
+send_neighbors(grid_2d, PIDS, Side, Node_no) ->
+    io:fwrite("Inside send_neighbors, Running for node - ~p \n\n", [Node_no]),
+    if Node_no =< Side or (Node_no + Side > (Side * Side)) ->
+        % send_node_neighbors(edge, Node_no + Side > (Side * Side), Side, Node_no, math:mod(Node_no, Side), PIDS);
+         send_node_neighbors(edge, Node_no + Side > (Side * Side), Side, Node_no, Node_no rem Side, PIDS);
+    true ->
+        % send_node_neighbors(math:mod(Node_no, Side), Side, Node_no, PIDS)
+        send_node_neighbors(Node_no rem Side, Side, Node_no, PIDS)
+    end,
+    send_neighbors(grid_2d, PIDS, Side, Node_no-1);
+
 
 % Find neighbors for line, given the last element. Will check that number of nodes is satisfied.
 send_neighbors(line, _, max, 1) ->
@@ -73,6 +139,8 @@ send_neighbors(full, PIDS, max, N) ->
     Self = lists:nth(N, PIDS),
     Self ! {neighbor, lists:delete(Self, PIDS)},
     send_neighbors(full, PIDS, N-1).
+
+
 
 % Finished sending neighbors.
 send_neighbors(_, _, 0) ->

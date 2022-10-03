@@ -28,7 +28,9 @@ start_run(gossip, PIDS) ->
     N = rand:uniform(Len),
     PID = lists:nth(N, PIDS),
     PID ! {msg, "This is the rumor"},
-    wait_complete(gossip, PIDS).
+    wait_complete(gossip, PIDS);
+start_run('push-sum', PIDS) ->
+    ok.
 
 wait_complete(gossip, []) ->
     ok;
@@ -63,17 +65,26 @@ spawn_actors(NoNodes, full, Algo) ->
 spawn_actors(NoNodes, grid_2d, Algo) ->
     TotalNoNodesRoot = trunc(math:ceil(math:sqrt(NoNodes))),
     TotalNoNodes = TotalNoNodesRoot*TotalNoNodesRoot,
-    PIDS = spawn_many(TotalNoNodes, Algo),
-    send_neighbors(grid_2d, PIDS, TotalNoNodesRoot, TotalNoNodes),
-    PIDS;
+    if TotalNoNodes < 4 ->
+        exit('Not enough nodes');
+    true ->
+        PIDS = spawn_many(TotalNoNodes, Algo),
+        send_neighbors(grid_2d, PIDS, TotalNoNodesRoot, TotalNoNodes),
+        PIDS
+    end;
 
 % Spawn required number of actors for line topology and build 2d grid topology.
 spawn_actors(NoNodes, grid_3d, Algo) ->
     EdgeLength = trunc(math:ceil(math:pow(NoNodes, 1/3))),
-    TotalNoNodes = math:pow(EdgeLength, 3),
-    PIDS = spawn_many(TotalNoNodes, Algo),
-    send_neighbors(grid_3d, PIDS, EdgeLength, TotalNoNodes),
-    PIDS.
+    TotalNoNodes = trunc(math:pow(EdgeLength, 3)),
+    if TotalNoNodes < 8 ->
+        exit('Not enough nodes');
+    true ->
+        io:fwrite("*******Total no of nodes ~p\n", [TotalNoNodes]),
+        PIDS = spawn_many(TotalNoNodes, Algo),
+        send_neighbors(grid_3d, PIDS, EdgeLength, TotalNoNodes),
+        PIDS
+    end.
 %----------------------Sending Neighbors-----------------------------------------------------------------------
 
 %left edge
@@ -120,9 +131,9 @@ send_node_neighbors(1, Side, N, PIDS, threeDim) -> %5
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), 
         lists:nth(N + Side, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)
         ]}; 
 
 %right edge
@@ -130,9 +141,9 @@ send_node_neighbors(0, Side, N, PIDS, threeDim) -> %5
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + Side, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 % Send node neighbors for nodes not on the edge of the 2d plane
 send_node_neighbors(_, Side, N, PIDS, threeDim) -> %5
@@ -140,9 +151,9 @@ send_node_neighbors(_, Side, N, PIDS, threeDim) -> %5
         lists:nth(N + Side, PIDS), 
         lists:nth(N + 1, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]};
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]};
 
 %Three dim - first plane ----------------------------
 %left edge
@@ -150,8 +161,8 @@ send_node_neighbors(1, Side, N, PIDS, firstPlane) -> %5
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), 
         lists:nth(N + Side, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)
         ]}; 
 
 %right edge
@@ -159,8 +170,8 @@ send_node_neighbors(0, Side, N, PIDS, firstPlane) -> %5
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + Side, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 % Send node neighbors for nodes not on the edge of the 2d plane
 send_node_neighbors(_, Side, N, PIDS, firstPlane) -> %5
@@ -168,8 +179,8 @@ send_node_neighbors(_, Side, N, PIDS, firstPlane) -> %5
         lists:nth(N + Side, PIDS), 
         lists:nth(N + 1, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]};
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]};
 
 %Three dim - last plane ----------------------------
 %left edge
@@ -177,8 +188,8 @@ send_node_neighbors(1, Side, N, PIDS, lastPlane) -> %5
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), 
         lists:nth(N + Side, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)
         ]}; 
 
 %right edge
@@ -186,8 +197,8 @@ send_node_neighbors(0, Side, N, PIDS, lastPlane) -> %5
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + Side, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 % Send node neighbors for nodes not on the edge of the 2d plane
 send_node_neighbors(_, Side, N, PIDS, lastPlane) -> %5
@@ -195,8 +206,8 @@ send_node_neighbors(_, Side, N, PIDS, lastPlane) -> %5
         lists:nth(N + Side, PIDS), 
         lists:nth(N + 1, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS) ]}.
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS) ]}.
 
 
 % Bottom row
@@ -205,51 +216,51 @@ send_node_neighbors(edge, true, Side, N, 1, PIDS, threeDim) -> %7
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS),
         lists:nth(N - Side, PIDS), 
         % lists:nth(N + Side, PIDS), 
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, true, Side, N, 0, PIDS, threeDim) -> %7
     %right most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, true, Side, N, _, PIDS, threeDim) -> %7
     %inner  nodes
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + 1, PIDS),
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 %Top row
 send_node_neighbors(edge, false, Side, N, 1, PIDS, threeDim) -> %7
     %left most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), 
         lists:nth(N + Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, false, Side, N, 0, PIDS, threeDim) -> %7
     %right most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, false, Side, N, _, PIDS, threeDim) -> %7
     % inner node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + 1, PIDS),
         lists:nth(N + Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]};
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]};
 
 %Three dim - first plane ----------------------------
 
@@ -259,46 +270,46 @@ send_node_neighbors(edge, true, Side, N, 1, PIDS, firstPlane) -> %7
     %left most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS),
         lists:nth(N - Side, PIDS), 
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)
     ]}; 
 
 send_node_neighbors(edge, true, Side, N, 0, PIDS, firstPlane) -> %7
     %right most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, true, Side, N, _, PIDS, firstPlane) -> %7
     %inner  nodes
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + 1, PIDS),
         lists:nth(N - Side, PIDS),
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 %Top row
 send_node_neighbors(edge, false, Side, N, 1, PIDS, firstPlane) -> %7
     %left most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), 
         lists:nth(N + Side, PIDS),
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, false, Side, N, 0, PIDS, firstPlane) -> %7
     %right most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + Side, PIDS),
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, false, Side, N, _, PIDS, firstPlane) -> %7
     % inner node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + 1, PIDS),
         lists:nth(N + Side, PIDS),
-        lists:nth(N + math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]};
+        lists:nth(N + trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]};
 
 %Three dim - last plane ----------------------------
 
@@ -309,46 +320,46 @@ send_node_neighbors(edge, true, Side, N, 1, PIDS, lastPlane) -> %7
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS),
         lists:nth(N - Side, PIDS), 
         % lists:nth(N + Side, PIDS), 
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)
     ]}; 
 
 send_node_neighbors(edge, true, Side, N, 0, PIDS, lastPlane) -> %7
     %right most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, true, Side, N, _, PIDS, lastPlane) -> %7
     %inner  nodes
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + 1, PIDS),
         lists:nth(N - Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 %Top row
 send_node_neighbors(edge, false, Side, N, 1, PIDS, lastPlane) -> %7
     %left most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N + 1, PIDS), 
         lists:nth(N + Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, false, Side, N, 0, PIDS, lastPlane) -> %7
     %right most node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS),
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}; 
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS),
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}; 
 
 send_node_neighbors(edge, false, Side, N, _, PIDS, lastPlane) -> %7
     % inner node
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), 
         lists:nth(N + 1, PIDS),
         lists:nth(N + Side, PIDS),
-        lists:nth(N - math:pow(Side, 2), PIDS) ,
-        lists:nth(rand:uniform(math:pow(Side, 3)), PIDS)]}.
+        lists:nth(N - trunc(math:pow(Side, 2)), PIDS) ,
+        lists:nth(rand:uniform(trunc(math:pow(Side, 3))), PIDS)]}.
 
 
 % First plane i.e., front most plane
@@ -358,7 +369,7 @@ get_neighbors(grid_3d, PIDS, 1, Side, Node_no) -> %5
     (Node_no + Side > (Side * Side)) ->
         send_node_neighbors(edge, Node_no + Side > (Side * Side), Side, Node_no, Node_no rem Side, PIDS, firstPlane);
     true ->
-        get_neighbors(Node_no rem Side, Side, Node_no, PIDS, firstPlane)
+        send_node_neighbors(Node_no rem Side, Side, Node_no, PIDS, firstPlane)
     end;
 
 % Last plane 
@@ -368,7 +379,7 @@ get_neighbors(grid_3d, PIDS, last, Side, Node_no) -> %5
     (Node_no + Side > (Side * Side)) ->
         send_node_neighbors(edge, Node_no + Side > (Side * Side), Side, Node_no, Node_no rem Side, PIDS, lastPlane);
     true ->
-        get_neighbors(Node_no rem Side, Side, Node_no, PIDS, lastPlane)
+        send_node_neighbors(Node_no rem Side, Side, Node_no, PIDS, lastPlane)
     end;
 
 
@@ -379,7 +390,7 @@ get_neighbors(grid_3d, PIDS, _, Side, Node_no) -> %5
     (Node_no + Side > (Side * Side)) ->
         send_node_neighbors(edge, Node_no + Side > (Side * Side), Side, Node_no, Node_no rem Side, PIDS, threeDim);
     true ->
-        get_neighbors(Node_no rem Side, Side, Node_no, PIDS, threeDim)
+        send_node_neighbors(Node_no rem Side, Side, Node_no, PIDS, threeDim)
     end.
 
 % Find neighbors for full for node N.
@@ -410,20 +421,22 @@ send_neighbors(grid_3d, _, _, 0)  -> %4
 
 %Find neighbors for 3D grid
 send_neighbors(grid_3d, PIDS, EdgeLength, Node_no) -> %4
-    PlaneNumber = Node_no div (EdgeLength*EdgeLength) ,
-    if PlaneNumber /= 0 ->
-        PlaneNumber = PlaneNumber + 1;
-    if PlaneNumber == EdgeLength ->
+    PlaneNumber = Node_no div (EdgeLength*EdgeLength),
+    Remainder = Node_no rem (EdgeLength*EdgeLength),
+    if Remainder /= 0 ->
+        NewPlaneNumber = PlaneNumber + 1;
+    true ->
+        NewPlaneNumber = PlaneNumber
+    end,
+    if NewPlaneNumber == EdgeLength ->
         get_neighbors(grid_3d, PIDS, last, EdgeLength, Node_no);
     true ->
-        get_neighbors(grid_3d, PIDS, PlaneNumber, EdgeLength, Node_no)
+        get_neighbors(grid_3d, PIDS, NewPlaneNumber, EdgeLength, Node_no)
     end,
-    % send_node_neighbors(grid_3d, PIDS, PlaneNumber, EdgeLength, Node_no),
     send_neighbors(grid_3d, PIDS, EdgeLength, Node_no-1);
 
 % Find neighbors for 2D grid
 send_neighbors(grid_2d, PIDS, Side, Node_no) -> %4
-    % io:fwrite("Inside send_neighbors, Running for node - ~p who has PID ~p\n\n", [Node_no, lists:nth(Node_no, PIDS)]),
     if Node_no =< Side ->
          send_node_neighbors(edge, Node_no + Side > (Side * Side), Side, Node_no, Node_no rem Side, PIDS);
     (Node_no + Side > (Side * Side)) ->

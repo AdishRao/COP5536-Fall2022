@@ -80,7 +80,6 @@ spawn_actors(NoNodes, grid_3d, Algo) ->
     if TotalNoNodes < 8 ->
         exit('Not enough nodes');
     true ->
-        io:fwrite("*******Total no of nodes ~p\n", [TotalNoNodes]),
         PIDS = spawn_many(TotalNoNodes, Algo),
         send_neighbors(grid_3d, PIDS, EdgeLength, TotalNoNodes),
         PIDS
@@ -485,7 +484,8 @@ gossip(MyNeighbors, gossip) ->
     end;
 % Run pushsum algo.
 gossip(MyNeighbors, 'push-sum') ->
-    io:fwrite("I am ~p and I can talk to ~p\n\n", [self(), MyNeighbors]).
+    %io:fwrite("I am ~p and I can talk to ~p\n\n", [self(), MyNeighbors]).
+    ok.
 
 
 gossip(MyNeighbors, gossip, StoredMsg, 0) ->

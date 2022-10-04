@@ -2,6 +2,8 @@
 
 -compile(export_all).
 
+-define(DEATHPROB, 1).
+
 start(NoNodes, Topology, Algo) ->
     spawn_link(main, start_server, [NoNodes, Topology, Algo]),
     process_flag(trap_exit, true),
@@ -23,12 +25,16 @@ start_server(NoNodes, Topology, Algo) ->
     io:fwrite("Total clock time: ~p microseconds(10^-9)\n", [timer:now_diff(T2, T1)]),
     exit(done).
 
+% Start gossip algo
+
 start_run(gossip, PIDS) ->
     Len = length(PIDS),
     N = rand:uniform(Len),
     PID = lists:nth(N, PIDS),
     PID ! {msg, "This is the rumor"},
     wait_complete(gossip, PIDS);
+
+% Start push sum algo
 start_run('push-sum', PIDS) ->
     ok.
 
@@ -39,6 +45,9 @@ wait_complete(gossip, PIDS) ->
         {done, PID} ->
             io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
             wait_complete(gossip, lists:delete(PID, PIDS))
+    after
+        10000 ->
+            io:fwrite("Failed after 10s, too many dead nodes\n")
     end.
 
 % Spawn required number of nodes and provide the algorithm being used (gossip or push-sum).
@@ -392,6 +401,9 @@ get_neighbors(grid_3d, PIDS, _, Side, Node_no) -> %5
         send_node_neighbors(Node_no rem Side, Side, Node_no, PIDS, threeDim)
     end.
 
+% Finished sending neighbors full and line.
+send_neighbors(_, _, 0) ->  %3
+    ok;
 % Find neighbors for full for node N.
 send_neighbors(full, PIDS, N) -> %3
     Self = lists:nth(N, PIDS),
@@ -405,11 +417,7 @@ send_neighbors(line, PIDS, 1) -> %3
 
 send_neighbors(line, PIDS, N) -> %3
     lists:nth(N, PIDS) ! {neighbor, [lists:nth(N - 1, PIDS), lists:nth(N + 1, PIDS)]},
-    send_neighbors(line, PIDS, N-1);
-
-% Finished sending neighbors.
-send_neighbors(_, _, 0) ->  %3
-    ok.  
+    send_neighbors(line, PIDS, N-1).  
 
 %Finished sending neighbors in the plane
 send_neighbors(grid_2d, _, _, 0)  ->  %4
@@ -501,18 +509,23 @@ gossip(MyNeighbors, gossip, StoredMsg, -1) ->
     gossip(MyNeighbors, gossip, StoredMsg, -1);
 
 gossip(MyNeighbors, gossip, StoredMsg, N) ->
-    receive
-        {msg, Msg} ->
-            Len = length(MyNeighbors),
-            PID_Index = rand:uniform(Len),
-            PID = lists:nth(PID_Index, MyNeighbors),
-            PID ! {msg, Msg},
-            gossip(MyNeighbors, gossip, Msg, N-1)
-    after
-        0 ->
-            Len = length(MyNeighbors),
-            PID_Index = rand:uniform(Len),
-            PID = lists:nth(PID_Index, MyNeighbors),
-            PID ! {msg, StoredMsg},
-            gossip(MyNeighbors, gossip, StoredMsg, N)
+    Death = rand:uniform(),
+    if Death =< ?DEATHPROB ->
+        dead;
+    true ->    
+        receive
+            {msg, Msg} ->
+                Len = length(MyNeighbors),
+                PID_Index = rand:uniform(Len),
+                PID = lists:nth(PID_Index, MyNeighbors),
+                PID ! {msg, Msg},
+                gossip(MyNeighbors, gossip, Msg, N-1)
+        after
+            0 ->
+                Len = length(MyNeighbors),
+                PID_Index = rand:uniform(Len),
+                PID = lists:nth(PID_Index, MyNeighbors),
+                PID ! {msg, StoredMsg},
+                gossip(MyNeighbors, gossip, StoredMsg, N)
+        end
     end.

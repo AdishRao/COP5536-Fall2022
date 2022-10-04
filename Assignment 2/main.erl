@@ -19,10 +19,11 @@ start_server(NoNodes, Topology, Algo) ->
     register(server, self()),
     PIDS = spawn_actors(NoNodes, Topology, Algo),
     T1 = erlang:timestamp(),
-    start_run(Algo, PIDS),
+    Status = start_run(Algo, PIDS),
     T2 = erlang:timestamp(),
 
     io:fwrite("Total clock time: ~p microseconds(10^-9)\n", [timer:now_diff(T2, T1)]),
+    io:fwrite("~p, ~p, ~p, ~p\n", [timer:now_diff(T2, T1), length(PIDS), ?DEATHPROB, Status]),
     exit(done).
 
 % Start gossip algo
@@ -32,7 +33,8 @@ start_run(gossip, PIDS) ->
     N = rand:uniform(Len),
     PID = lists:nth(N, PIDS),
     PID ! {msg, "This is the rumor"},
-    wait_complete(gossip, PIDS);
+    Status = wait_complete(gossip, PIDS),
+    Status;
 
 % Start push sum algo
 start_run('push-sum', PIDS) ->
@@ -40,7 +42,8 @@ start_run('push-sum', PIDS) ->
     N = rand:uniform(Len),
     PID = lists:nth(N, PIDS),
     PID ! {start},
-    wait_complete('push-sum', PIDS).
+    Status = wait_complete('push-sum', PIDS),
+    Status.
 
 wait_complete(gossip, []) ->
     ok;
@@ -52,7 +55,8 @@ wait_complete(gossip, PIDS) ->
             wait_complete(gossip, lists:delete(PID, PIDS))
     after
         10000 ->
-            io:fwrite("Failed after 10s, too many dead nodes\n")
+            io:fwrite("Failed after 10s, too many dead nodes\n"),
+            failed
     end;
 
 wait_complete('push-sum', []) ->

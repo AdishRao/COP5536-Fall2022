@@ -39,9 +39,7 @@ start_run('push-sum', PIDS) ->
     Len = length(PIDS),
     N = rand:uniform(Len),
     PID = lists:nth(N, PIDS),
-    S = pid_tokens(PID),
-    W = 1,
-    PID ! {PID, S, W},
+    PID ! {start},
     wait_complete('push-sum', PIDS).
 
 wait_complete(gossip, []) ->
@@ -49,7 +47,8 @@ wait_complete(gossip, []) ->
 wait_complete(gossip, PIDS) ->
     receive
         {done, PID} ->
-            io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
+            %io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
+            io:fwrite("PID ~p has finished\n", [PID]),
             wait_complete(gossip, lists:delete(PID, PIDS))
     after
         10000 ->
@@ -61,7 +60,8 @@ wait_complete('push-sum', []) ->
 wait_complete('push-sum', PIDS) ->
     receive
         {done, PID} ->
-            io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
+            %io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
+            io:fwrite("PID ~p has finished\n", [PID]),
             wait_complete('push-sum', lists:delete(PID, PIDS))
     after
         10000 ->
@@ -518,22 +518,29 @@ gossip(MyNeighbors, gossip) ->
 
 % Run pushsum algo.
 gossip(MyNeighbors, 'push-sum') ->
-    %io:fwrite("I am ~p and I can talk to ~p\n\n", [self(), MyNeighbors]).
+    S = pid_tokens(self()),
+    W = 1,
+    Len = length(MyNeighbors),
+    PID_Index = rand:uniform(Len),
+    PID = lists:nth(PID_Index, MyNeighbors),
+    No_trials = 0,
     receive
-        {Rec_PID, Rec_S, Rec_W}->
-            S = pid_tokens(Rec_PID),
-            W = 1,
-            Len = length(MyNeighbors),
-            PID_Index = rand:uniform(Len),
-            PID = lists:nth(PID_Index, MyNeighbors),
-            Send_S = (Rec_S + S)/2,
+        {Rec_S, Rec_W}->
+            Send_S = (Rec_S + S) / 2,
             Send_W = (Rec_W + W) / 2,
-            PID ! {Rec_PID, Send_S, Send_W},
+            PID ! {Send_S, Send_W},
             Cur_S = Send_S,
             Cur_W = Send_W,
             Sum_estimate = Cur_S / Cur_W,
-            No_trials = 0,
-            gossip(MyNeighbors, 'push-sum', Sum_estimate, Cur_S, Cur_W, Rec_PID, No_trials)
+            gossip(MyNeighbors, 'push-sum', Sum_estimate, Cur_S, Cur_W, No_trials);
+        {start} ->
+            Send_S = (S) / 2,
+            Send_W = (W) / 2,
+            PID ! {Send_S, Send_W},
+            Cur_S = Send_S,
+            Cur_W = Send_W,
+            Sum_estimate = Cur_S / Cur_W,
+            gossip(MyNeighbors, 'push-sum', Sum_estimate, Cur_S, Cur_W, No_trials)
     end.
 
 
@@ -541,10 +548,6 @@ gossip(MyNeighbors, 'push-sum') ->
 gossip(MyNeighbors, gossip, StoredMsg, 0) ->
     server ! {done, self()},
     gossip(MyNeighbors, gossip, StoredMsg, -1);
-
-% Received same value of sum estimate for three consecutive trials, tell server done.
-gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, MyPID, 3) ->
-    server ! {done, self()};
     
 % Send message to remaining nodes not yet done.
 gossip(MyNeighbors, gossip, StoredMsg, -1) ->
@@ -578,34 +581,65 @@ gossip(MyNeighbors, gossip, StoredMsg, N) ->
         end
     end.
 
-gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, MyPID, Same_count)->
+% Received same value of sum estimate for three consecutive trials, tell server done.
+gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, 3) ->
+    server ! {done, self()},
+    gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, -1);
+
+gossip(MyNeighbors, 'push-sum', _, S, W, -1)->
+    Len = length(MyNeighbors),
+    PID_Index = rand:uniform(Len),
+    PID = lists:nth(PID_Index, MyNeighbors),
+    receive
+        {Rec_S, Rec_W}->
+            Send_S = (Rec_S + S) / 2,
+            Send_W = (Rec_W + W) / 2
+    after
+        0 ->
+            Send_S = (S) / 2,
+            Send_W = (W) / 2
+    end,
+    PID ! {Send_S, Send_W},
+    Cur_S = Send_S,
+    Cur_W = Send_W,
+    New_sum_estimate = Cur_S / Cur_W,
+    timer:sleep(100),
+    gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, -1);
+
+gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, Same_count)->
     Death = rand:uniform(),
     if Death =< ?DEATHPROB ->
         dead;
-    true ->    
+    true ->
+        Len = length(MyNeighbors),
+        PID_Index = rand:uniform(Len),
+        PID = lists:nth(PID_Index, MyNeighbors),
         receive
-             {Rec_PID, Rec_S, Rec_W}->
-                Len = length(MyNeighbors),
-                PID_Index = rand:uniform(Len),
-                PID = lists:nth(PID_Index, MyNeighbors),
-                Send_S = (Rec_S + S)/2,
+            {Rec_S, Rec_W}->
+                Send_S = (Rec_S + S) / 2,
                 Send_W = (Rec_W + W) / 2,
-                PID ! {MyPID, Send_S, Send_W},
+                PID ! {Send_S, Send_W},
                 Cur_S = Send_S,
                 Cur_W = Send_W,
                 New_sum_estimate = Cur_S / Cur_W,
-                if New_sum_estimate - Sum_estimate < math:pow(10, -10) ->
-                    New_same_count = Same_count + 1;
-                (Sum_estimate - New_sum_estimate) < math:pow(10, -10) ->
+                Diff = New_sum_estimate - Sum_estimate,
+                Absdiff = abs(Diff),
+                Delta = math:pow(10, -10),
+                if (Absdiff < Delta) ->
                     New_same_count = Same_count + 1;
                 true ->
                     New_same_count = 0
                 end,
-                gossip(MyNeighbors, 'push-sum', Sum_estimate, Cur_S, Cur_W, Rec_PID, New_same_count)
+                gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, New_same_count)
         after
-            0 ->
-                gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, MyPID, Same_count)
+            100 ->
+                Send_S = (S) / 2,
+                Send_W = (W) / 2,
+                PID ! {Send_S, Send_W},
+                Cur_S = Send_S,
+                Cur_W = Send_W,
+                %io:fwrite("Current S ~p and Cur W ~p\n",[Cur_S, Cur_W]),
+                New_sum_estimate = Cur_S / Cur_W,
+                gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, Same_count)
         end
     end.
-
-    

@@ -64,8 +64,8 @@ wait_complete('push-sum', PIDS) ->
             io:fwrite("PID ~p has finished\n", [PID]),
             wait_complete('push-sum', lists:delete(PID, PIDS))
     after
-        10000 ->
-            io:fwrite("Failed after 10s, too many dead nodes\n")
+        100000 ->
+            io:fwrite("Failed after 100s, too many dead nodes\n")
     end.
 
 % Spawn required number of nodes and provide the algorithm being used (gossip or push-sum).
@@ -595,7 +595,7 @@ gossip(MyNeighbors, 'push-sum', _, S, W, -1)->
             Send_S = (Rec_S + S) / 2,
             Send_W = (Rec_W + W) / 2
     after
-        0 ->
+        100 ->
             Send_S = (S) / 2,
             Send_W = (W) / 2
     end,
@@ -603,7 +603,6 @@ gossip(MyNeighbors, 'push-sum', _, S, W, -1)->
     Cur_S = Send_S,
     Cur_W = Send_W,
     New_sum_estimate = Cur_S / Cur_W,
-    timer:sleep(100),
     gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, -1);
 
 gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, Same_count)->

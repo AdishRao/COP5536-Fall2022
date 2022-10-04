@@ -2,7 +2,7 @@
 
 -compile(export_all).
 
--define(DEATHPROB, 1).
+-define(DEATHPROB, 0).
 
 start(NoNodes, Topology, Algo) ->
     spawn_link(main, start_server, [NoNodes, Topology, Algo]),

@@ -2,7 +2,7 @@
 
 -compile(export_all).
 
--define(DEATHPROB, 0).
+-define(DEATHPROB, 0.1).
 
 start(NoNodes, Topology, Algo) ->
     spawn_link(main, start_server, [NoNodes, Topology, Algo]),
@@ -23,7 +23,7 @@ start_server(NoNodes, Topology, Algo) ->
     T2 = erlang:timestamp(),
 
     io:fwrite("Total clock time: ~p microseconds(10^-9)\n", [timer:now_diff(T2, T1)]),
-    io:fwrite("~p, ~p, ~p, ~p\n", [timer:now_diff(T2, T1), length(PIDS), ?DEATHPROB, Status]),
+    io:fwrite("~p, ~p, ~p, ~p, ~p, ~p\n", [Algo, Topology, timer:now_diff(T2, T1), length(PIDS), ?DEATHPROB, Status]),
     exit(done).
 
 % Start gossip algo
@@ -33,7 +33,7 @@ start_run(gossip, PIDS) ->
     N = rand:uniform(Len),
     PID = lists:nth(N, PIDS),
     PID ! {msg, "This is the rumor"},
-    Status = wait_complete(gossip, PIDS),
+    Status = wait_complete(gossip, PIDS, ok),
     Status;
 
 % Start push sum algo
@@ -42,34 +42,44 @@ start_run('push-sum', PIDS) ->
     N = rand:uniform(Len),
     PID = lists:nth(N, PIDS),
     PID ! {start},
-    Status = wait_complete('push-sum', PIDS),
+    Status = wait_complete('push-sum', PIDS, ok),
     Status.
 
-wait_complete(gossip, []) ->
-    ok;
-wait_complete(gossip, PIDS) ->
+wait_complete(gossip, [], Status) ->
+    Status;
+wait_complete(gossip, PIDS, Status) ->
     receive
         {done, PID} ->
             %io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
             io:fwrite("PID ~p has finished\n", [PID]),
-            wait_complete(gossip, lists:delete(PID, PIDS))
+            wait_complete(gossip, lists:delete(PID, PIDS), Status);
+        {dead, PID} ->
+            %io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
+            io:fwrite("PID ~p has died\n", [PID]),
+            wait_complete(gossip, lists:delete(PID, PIDS), 'dead_node_success')
     after
         10000 ->
             io:fwrite("Failed after 10s, too many dead nodes\n"),
             failed
     end;
 
-wait_complete('push-sum', []) ->
-    ok;
-wait_complete('push-sum', PIDS) ->
+wait_complete('push-sum', [], Status) ->
+    Status;
+wait_complete('push-sum', PIDS, Status) ->
     receive
         {done, PID} ->
             %io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
             io:fwrite("PID ~p has finished\n", [PID]),
-            wait_complete('push-sum', lists:delete(PID, PIDS))
+            wait_complete(gossip, lists:delete(PID, PIDS), Status);
+        {dead, PID} ->
+            %io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
+            io:fwrite("PID ~p has died\n", [PID]),
+            wait_complete(gossip, lists:delete(PID, PIDS), 'dead_node_success')
     after
         100000 ->
-            io:fwrite("Failed after 100s, too many dead nodes\n")
+            io:fwrite("Failed after 100s, too many dead nodes\n"),
+            failed
+
     end.
 
 % Spawn required number of nodes and provide the algorithm being used (gossip or push-sum).
@@ -510,14 +520,18 @@ start_gossip(Algo) ->
 
 % Run gossip algo.
 gossip(MyNeighbors, gossip) ->
-    %io:fwrite("I am ~p and I can talk to ~p\n\n", [self(), MyNeighbors]);
     receive
         {msg, Msg} ->
-            Len = length(MyNeighbors),
-            PID_Index = rand:uniform(Len),
-            PID = lists:nth(PID_Index, MyNeighbors),
-            PID ! {msg, Msg},
-            gossip(MyNeighbors, gossip, Msg, 9)
+            Death = rand:uniform(),
+            if Death =< ?DEATHPROB ->
+                server ! {dead, self()};
+            true ->
+                Len = length(MyNeighbors),
+                PID_Index = rand:uniform(Len),
+                PID = lists:nth(PID_Index, MyNeighbors),
+                PID ! {msg, Msg},
+                gossip(MyNeighbors, gossip, Msg, 9)
+            end
     end;
 
 % Run pushsum algo.
@@ -530,21 +544,31 @@ gossip(MyNeighbors, 'push-sum') ->
     No_trials = 0,
     receive
         {Rec_S, Rec_W}->
-            Send_S = (Rec_S + S) / 2,
-            Send_W = (Rec_W + W) / 2,
-            PID ! {Send_S, Send_W},
-            Cur_S = Send_S,
-            Cur_W = Send_W,
-            Sum_estimate = Cur_S / Cur_W,
-            gossip(MyNeighbors, 'push-sum', Sum_estimate, Cur_S, Cur_W, No_trials);
+            Death = rand:uniform(),
+            if Death =< ?DEATHPROB ->
+                server ! {dead, self()};
+            true ->
+                Send_S = (Rec_S + S) / 2,
+                Send_W = (Rec_W + W) / 2,
+                PID ! {Send_S, Send_W},
+                Cur_S = Send_S,
+                Cur_W = Send_W,
+                Sum_estimate = Cur_S / Cur_W,
+                gossip(MyNeighbors, 'push-sum', Sum_estimate, Cur_S, Cur_W, No_trials)
+            end;
         {start} ->
-            Send_S = (S) / 2,
-            Send_W = (W) / 2,
-            PID ! {Send_S, Send_W},
-            Cur_S = Send_S,
-            Cur_W = Send_W,
-            Sum_estimate = Cur_S / Cur_W,
-            gossip(MyNeighbors, 'push-sum', Sum_estimate, Cur_S, Cur_W, No_trials)
+            Death = rand:uniform(),
+            if Death =< ?DEATHPROB ->
+                server ! {dead, self()};
+            true ->
+                Send_S = (S) / 2,
+                Send_W = (W) / 2,
+                PID ! {Send_S, Send_W},
+                Cur_S = Send_S,
+                Cur_W = Send_W,
+                Sum_estimate = Cur_S / Cur_W,
+                gossip(MyNeighbors, 'push-sum', Sum_estimate, Cur_S, Cur_W, No_trials)
+            end
     end.
 
 
@@ -564,25 +588,20 @@ gossip(MyNeighbors, gossip, StoredMsg, -1) ->
 
 % Loop sending and recieving messages.
 gossip(MyNeighbors, gossip, StoredMsg, N) ->
-    Death = rand:uniform(),
-    if Death =< ?DEATHPROB ->
-        dead;
-    true ->    
-        receive
-            {msg, Msg} ->
-                Len = length(MyNeighbors),
-                PID_Index = rand:uniform(Len),
-                PID = lists:nth(PID_Index, MyNeighbors),
-                PID ! {msg, Msg},
-                gossip(MyNeighbors, gossip, Msg, N-1)
-        after
-            0 ->
-                Len = length(MyNeighbors),
-                PID_Index = rand:uniform(Len),
-                PID = lists:nth(PID_Index, MyNeighbors),
-                PID ! {msg, StoredMsg},
-                gossip(MyNeighbors, gossip, StoredMsg, N)
-        end
+    receive
+        {msg, Msg} ->
+            Len = length(MyNeighbors),
+            PID_Index = rand:uniform(Len),
+            PID = lists:nth(PID_Index, MyNeighbors),
+            PID ! {msg, Msg},
+            gossip(MyNeighbors, gossip, Msg, N-1)
+    after
+        0 ->
+            Len = length(MyNeighbors),
+            PID_Index = rand:uniform(Len),
+            PID = lists:nth(PID_Index, MyNeighbors),
+            PID ! {msg, StoredMsg},
+            gossip(MyNeighbors, gossip, StoredMsg, N)
     end.
 
 % Received same value of sum estimate for three consecutive trials, tell server done.
@@ -610,39 +629,34 @@ gossip(MyNeighbors, 'push-sum', _, S, W, -1)->
     gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, -1);
 
 gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, Same_count)->
-    Death = rand:uniform(),
-    if Death =< ?DEATHPROB ->
-        dead;
-    true ->
-        Len = length(MyNeighbors),
-        PID_Index = rand:uniform(Len),
-        PID = lists:nth(PID_Index, MyNeighbors),
-        receive
-            {Rec_S, Rec_W}->
-                Send_S = (Rec_S + S) / 2,
-                Send_W = (Rec_W + W) / 2,
-                PID ! {Send_S, Send_W},
-                Cur_S = Send_S,
-                Cur_W = Send_W,
-                New_sum_estimate = Cur_S / Cur_W,
-                Diff = New_sum_estimate - Sum_estimate,
-                Absdiff = abs(Diff),
-                Delta = math:pow(10, -10),
-                if (Absdiff < Delta) ->
-                    New_same_count = Same_count + 1;
-                true ->
-                    New_same_count = 0
-                end,
-                gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, New_same_count)
-        after
-            100 ->
-                Send_S = (S) / 2,
-                Send_W = (W) / 2,
-                PID ! {Send_S, Send_W},
-                Cur_S = Send_S,
-                Cur_W = Send_W,
-                %io:fwrite("Current S ~p and Cur W ~p\n",[Cur_S, Cur_W]),
-                New_sum_estimate = Cur_S / Cur_W,
-                gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, Same_count)
-        end
+    Len = length(MyNeighbors),
+    PID_Index = rand:uniform(Len),
+    PID = lists:nth(PID_Index, MyNeighbors),
+    receive
+        {Rec_S, Rec_W}->
+            Send_S = (Rec_S + S) / 2,
+            Send_W = (Rec_W + W) / 2,
+            PID ! {Send_S, Send_W},
+            Cur_S = Send_S,
+            Cur_W = Send_W,
+            New_sum_estimate = Cur_S / Cur_W,
+            Diff = New_sum_estimate - Sum_estimate,
+            Absdiff = abs(Diff),
+            Delta = math:pow(10, -10),
+            if (Absdiff < Delta) ->
+                New_same_count = Same_count + 1;
+            true ->
+                New_same_count = 0
+            end,
+            gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, New_same_count)
+    after
+        100 ->
+            Send_S = (S) / 2,
+            Send_W = (W) / 2,
+            PID ! {Send_S, Send_W},
+            Cur_S = Send_S,
+            Cur_W = Send_W,
+            %io:fwrite("Current S ~p and Cur W ~p\n",[Cur_S, Cur_W]),
+            New_sum_estimate = Cur_S / Cur_W,
+            gossip(MyNeighbors, 'push-sum', New_sum_estimate, Cur_S, Cur_W, Same_count)
     end.

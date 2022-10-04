@@ -471,6 +471,13 @@ send_neighbors(full, PIDS, max, N) -> %4
     send_neighbors(full, PIDS, N-1).
 
 %--------------------------------GOSSIP and PUSH SUM------------------------------------------------------------------
+
+pid_tokens(Pid) ->
+    PidStr = pid_to_list(Pid),
+    PidStr1 = lists:sublist(PidStr, 2, length(PidStr)-2),
+    [_, P1, _] = [list_to_integer(T) || T <- string:tokens(PidStr1,[$.])],
+    P1.
+
 % Actor waits for its neighbors.
 start_gossip(Algo) ->
     receive
@@ -490,16 +497,19 @@ gossip(MyNeighbors, gossip) ->
             PID ! {msg, Msg},
             gossip(MyNeighbors, gossip, Msg, 9)
     end;
+
 % Run pushsum algo.
 gossip(MyNeighbors, 'push-sum') ->
     %io:fwrite("I am ~p and I can talk to ~p\n\n", [self(), MyNeighbors]).
     ok.
 
 
+% Received 10 times, tell server done.
 gossip(MyNeighbors, gossip, StoredMsg, 0) ->
     server ! {done, self()},
     gossip(MyNeighbors, gossip, StoredMsg, -1);
 
+% Send message to remaining nodes not yet done.
 gossip(MyNeighbors, gossip, StoredMsg, -1) ->
     Len = length(MyNeighbors),
     PID_Index = rand:uniform(Len),
@@ -508,6 +518,7 @@ gossip(MyNeighbors, gossip, StoredMsg, -1) ->
     timer:sleep(100),
     gossip(MyNeighbors, gossip, StoredMsg, -1);
 
+% Loop sending and recieving messages.
 gossip(MyNeighbors, gossip, StoredMsg, N) ->
     Death = rand:uniform(),
     if Death =< ?DEATHPROB ->

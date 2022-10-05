@@ -2,7 +2,7 @@
 
 -compile(export_all).
 
--define(DEATHPROB, 0.1).
+-define(DEATHPROB, 0).
 
 start(NoNodes, Topology, Algo) ->
     spawn_link(main, start_server, [NoNodes, Topology, Algo]),
@@ -70,11 +70,11 @@ wait_complete('push-sum', PIDS, Status) ->
         {done, PID} ->
             %io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
             io:fwrite("PID ~p has finished\n", [PID]),
-            wait_complete(gossip, lists:delete(PID, PIDS), Status);
+            wait_complete('push-sum', lists:delete(PID, PIDS), Status);
         {dead, PID} ->
             %io:fwrite("PID ~p has finished waiting on remaining ~p\n", [PID, PIDS]),
             io:fwrite("PID ~p has died\n", [PID]),
-            wait_complete(gossip, lists:delete(PID, PIDS), 'dead_node_success')
+            wait_complete('push-sum', lists:delete(PID, PIDS), 'dead_node_success')
     after
         100000 ->
             io:fwrite("Failed after 100s, too many dead nodes\n"),
@@ -606,6 +606,7 @@ gossip(MyNeighbors, gossip, StoredMsg, N) ->
 
 % Received same value of sum estimate for three consecutive trials, tell server done.
 gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, 3) ->
+    %io:fwrite("Ratio: ~p in Process ~p\n", [(S/W), self()]),
     server ! {done, self()},
     gossip(MyNeighbors, 'push-sum', Sum_estimate, S, W, -1);
 

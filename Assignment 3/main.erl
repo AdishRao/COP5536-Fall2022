@@ -7,6 +7,22 @@
 start(numNodes, numRequests) ->
     ok.
 
+
+main(SelfNode, Successor, Predecessor, Finger) ->
+    spawn(main, update, [SelfNode, Successor, Predecessor, Finger]).
+
+
+
+% Runs update in background for ever node. Each node has a thread (actor)
+% Updating its successor and its Finger table.
+update(SelfNode, Successor, Predecessor, Finger) ->
+    NewSuccessor = stabilize(SelfNode, Successor),
+    {SelfID, SelfPID} = SelfNode,
+    SelfPID ! {update, NewSuccessor},
+    NewFinger = fix_fingers(), %TODO: Change.
+    SelfPID ! {fix_fingers, NewFinger},
+    timer:sleep(100).
+
 %n.find successor(id)
 % Finger is a list of {Id, PID} tuples
 find_successor(Id, ReqN, SelfN, Successor, Finger) ->

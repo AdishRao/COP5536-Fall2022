@@ -2,7 +2,7 @@
 
 -compile(export_all).
 
--define(M, 160).
+-define(Count, 160).
 
 start(NumNodes, NumRequests) ->
     PIDS = spawn_many(numNodes, max),

@@ -45,7 +45,8 @@ create(N) ->
 join(N, KnownNode) ->
     Predecessor = nil,
     {NodeID, NodePID} = N,
-    KnownNode ! {findsuccessor, NodeID, NodePID},
+    {KnownNodeID, KnownNodePID} = KnownNode,
+    KnownNodePID ! {findsuccessor, NodeID, NodePID},
     receive
         {Successor} ->
             ok
@@ -71,7 +72,7 @@ stabilize(N, Successor) ->
     true ->
         NewSuccessor = Successor
     end,
-    notify(NewSuccessor, N), % successor.notify(n);
+    NewSuccessor ! {notify, N}, % successor.notify(n);
     NewSuccessor.
 
 notify(_, _) ->

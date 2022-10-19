@@ -33,7 +33,7 @@ create_chord() ->
     PID = self(),
     N = {Id, PID},
     {Predecessor, Successor} = create(N),
-    Finger = fix_fingers(), %TODO: Change
+    Finger = fix_fingers(N, Count), %TODO: Change, define count
     run(N, Successor, Predecessor, Finger).
 
 join_chord() ->
@@ -43,7 +43,7 @@ join_chord() ->
     receive
         {KnownNode} ->
             {Predecessor, Successor} = join(N, KnownNode),
-            Finger = fix_fingers(), %TODO: Change
+            Finger = fix_fingers(N, Count), %TODO: Change, define count
             run(N, Successor, Predecessor, Finger)
     end.
 
@@ -66,6 +66,8 @@ run_loop(SelfNode, Successor, Predecessor, Finger) ->
         {notify, PossiblePredecessor} ->
             NewPredecessor =  notify(SelfNode, PossiblePredecessor, Predecessor),
             run_loop(SelfNode, Successor, NewPredecessor, Finger)
+        % {stillWorking} ->
+
     end.
 
 % Runs update in background for ever node. Each node has a thread (actor)
@@ -160,9 +162,29 @@ notify(Node, PossiblePredecessor, Predecessor) ->
     NewPredecessor.
 
 %fix_fingers - periodically refresh finger table entries
-fix_fingers() ->
-    % rand:uniform()
-    ok.
+
+fix_fingers(Node, Count) ->
+    if (Count > M) ->
+        New_Count = 1;
+    true ->
+        New_Count = Count,
+    New_Count = Count - 1,
+    lists:nth(New_Count, Finger)  = find_successor(Node + (math:pow(2, (New_Count - 1)))),
+    fix_fingers(Node, New_Count - 1).
+    
+
+% called periodically. checks whether predecessor has failed.
+check_predecessor(Predecessor) ->
+    Predecessor ! {stillWorking},
+    receive
+        {yes} ->
+            ok
+    after 
+        10000 ->
+            io:fwrite("Failure: No response from predecessor\n"),
+            Predecessor = nil
+    end.
+
 
 hash_data(Data, number) ->
     StringData = integer_to_list(Data),

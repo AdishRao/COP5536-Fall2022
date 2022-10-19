@@ -17,7 +17,16 @@ run_loop(SelfNode, Successor, Predecessor, Finger) ->
         {fix_fingers, NewFinger} ->
             run_loop(SelfNode, Successor, Predecessor, NewFinger);
         {update, NewSuccessor} ->
-            run_loop(SelfNode, NewSuccessor, Predecessor, Finger)
+            run_loop(SelfNode, NewSuccessor, Predecessor, Finger);
+        {findsuccessor, Id, ReqN} ->
+            find_successor(Id, ReqN, SelfNode, Successor, Finger),
+            run_loop(SelfNode, Successor, Predecessor, Finger);
+        {predecessor, ReqPID} ->
+            ReqPID ! {Predecessor},
+            run_loop(SelfNode, Successor, Predecessor, Finger);
+        {notify, PossiblePredecessor} ->
+            NewPredecessor =  notify(SelfNode, PossiblePredecessor, Predecessor),
+            run_loop(SelfNode, Successor, NewPredecessor, Finger)
     end.
 
 % Runs update in background for ever node. Each node has a thread (actor)
@@ -36,7 +45,7 @@ find_successor(Id, ReqN, SelfN, Successor, Finger) ->
     {SuccessorID, SuccessorPID} = Successor,
     {SelfID, SelfPID} = SelfN,
     Bool = (Id > SelfID) and (Id =< SuccessorID),
-    io:fwrite("Bool insidde find_successor ~p for variables ~p ~p ~p", [Bool, Id, SelfID, SuccessorID]),
+    io:fwrite("Bool inside find_successor ~p for variables ~p ~p ~p", [Bool, Id, SelfID, SuccessorID]),
     if Bool ->
         ReqN ! {Successor};
     true ->
@@ -77,13 +86,12 @@ join(N, KnownNode) ->
     %Successor also a tuple {ID, PID}
     {Predecessor, Successor}.
 
-
 %n.stabilize()
 %N is a tuple of {ID, PID}
 stabilize(N, Successor) ->
     {SuccessorID, SuccessorPID} = Successor,
     {NodeID, NodePID} = N,
-    Successor ! {predecessor},
+    Successor ! {predecessor, self()},
     receive
         {X} -> %successor.predecessor
             ok
@@ -96,7 +104,7 @@ stabilize(N, Successor) ->
         NewSuccessor = Successor
     end,
     % notify(NewSuccessor, N), % successor.notify(n);
-    NewSuccessor ! {notify, NewSuccessor, N},
+    NewSuccessor ! {notify, N},
     NewSuccessor.
 
 % PossiblePredecessor thinks it might be our predecessor

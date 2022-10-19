@@ -72,10 +72,26 @@ stabilize(N, Successor) ->
     true ->
         NewSuccessor = Successor
     end,
-    NewSuccessor ! {notify, N}, % successor.notify(n);
+    % notify(NewSuccessor, N), % successor.notify(n);
+    NewSuccessor ! {notify, NewSuccessor, N},
     NewSuccessor.
 
-notify(_, _) ->
+% PossiblePredecessor thinks it might be our predecessor
+notify(Node, PossiblePredecessor, Predecessor) ->
+    {NodeID, NodePID} = Node,
+    {PossiblePredecessorID, PossiblePredecessorPID} = PossiblePredecessor,
+    {PredecessorID, PredecessorPID} = Predecessor,
+    Bool = (PredecessorID = nil) or ((PossiblePredecessorID > PredecessorID) and (PossiblePredecessorID < NodeID)),
+    if Bool ->
+        NewPredecessor = PossiblePredecessor;
+    true ->
+        NewPredecessor = Predecessor
+    end,
+    NewPredecessor.
+
+%fix_fingers - periodically refresh finger table entries
+fix_fingers() ->
+    % rand:uniform()
     ok.
 
 hash_data(Data, number) ->

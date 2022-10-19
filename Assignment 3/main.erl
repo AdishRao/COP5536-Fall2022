@@ -9,9 +9,16 @@ start(numNodes, numRequests) ->
 
 
 main(SelfNode, Successor, Predecessor, Finger) ->
-    spawn(main, update, [SelfNode, Successor, Predecessor, Finger]).
+    spawn(main, update, [SelfNode, Successor, Predecessor, Finger]),
+    run_loop(SelfNode, Successor, Predecessor, Finger).
 
-
+run_loop(SelfNode, Successor, Predecessor, Finger) ->
+    receive
+        {fix_fingers, NewFinger} ->
+            run_loop(SelfNode, Successor, Predecessor, NewFinger);
+        {update, NewSuccessor} ->
+            run_loop(SelfNode, NewSuccessor, Predecessor, Finger)
+    end.
 
 % Runs update in background for ever node. Each node has a thread (actor)
 % Updating its successor and its Finger table.

@@ -37,13 +37,13 @@ closest_preceding_node(Id, SelfID, Finger, I) ->
 %n.create() n is calling create
 %Assume N is a tuple {ID, PID}
 create(N) ->
-    Predecessor = nil,
+    Predecessor = {nil, nil},
     Successor = N,
     {Predecessor, Successor}.
 
 %n.join(n′ ) asking node n to join n'
 join(N, KnownNode) ->
-    Predecessor = nil,
+    Predecessor = {nil, nil},
     {NodeID, NodePID} = N,
     {KnownNodeID, KnownNodePID} = KnownNode,
     KnownNodePID ! {findsuccessor, NodeID, NodePID},
@@ -81,7 +81,7 @@ notify(Node, PossiblePredecessor, Predecessor) ->
     {NodeID, NodePID} = Node,
     {PossiblePredecessorID, PossiblePredecessorPID} = PossiblePredecessor,
     {PredecessorID, PredecessorPID} = Predecessor,
-    Bool = (PredecessorID = nil) or ((PossiblePredecessorID > PredecessorID) and (PossiblePredecessorID < NodeID)),
+    Bool = (PredecessorID == nil) or ((PossiblePredecessorID > PredecessorID) and (PossiblePredecessorID < NodeID)),
     if Bool ->
         NewPredecessor = PossiblePredecessor;
     true ->

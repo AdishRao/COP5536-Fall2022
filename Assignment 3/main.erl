@@ -4,11 +4,50 @@
 
 -define(M, 160).
 
-start(numNodes, numRequests) ->
-    ok.
+start(NumNodes, NumRequests) ->
+    PIDS = spawn_many(numNodes, max),
+    build_chord(lists:sublist(PIDS, 2, NumNodes), [lists:nth(1, PIDS)]).
 
+build_chord([], _) ->
+    ok;
+build_chord(Remaining, Joined) ->
+    KnownNodePID = lists:nth(rand:uniform(length(Joined)), Joined),
+    KnownNodeID =  hash_data(pid_to_list(KnownNodePID), string),
+    KnownNode = {KnownNodeID, KnownNodePID},
+    NodePID =  lists:nth(1, Remaining),
+    NodePID ! {KnownNode},
+    timer:sleep(100),
+    build_chord(lists:delete(NodePID, Remaining), Joined ++ [NodePID]).
 
-main(SelfNode, Successor, Predecessor, Finger) ->
+spawn_many(0) ->
+    [];
+spawn_many(N) ->
+        PID = spawn_link(main, join_chord, []),
+        [PID] ++ spawn_many(N - 1).
+spawn_many(N, max) ->
+    PID = spawn_link(main, create_chord, []),
+    [PID] ++ spawn_many(N - 1).
+
+create_chord() ->
+    Id = hash_data(pid_to_list(self()), string),
+    PID = self(),
+    N = {Id, PID},
+    {Predecessor, Successor} = create(N),
+    Finger = fix_fingers(), %TODO: Change
+    run(N, Successor, Predecessor, Finger).
+
+join_chord() ->
+    Id = hash_data(pid_to_list(self()), string),
+    PID = self(),
+    N = {Id, PID},
+    receive
+        {KnownNode} ->
+            {Predecessor, Successor} = join(N, KnownNode),
+            Finger = fix_fingers(), %TODO: Change
+            run(N, Successor, Predecessor, Finger)
+    end.
+
+run(SelfNode, Successor, Predecessor, Finger) ->
     spawn(main, update, [SelfNode, Successor, Predecessor, Finger]),
     run_loop(SelfNode, Successor, Predecessor, Finger).
 

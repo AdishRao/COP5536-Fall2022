@@ -2,7 +2,7 @@
 
 -compile(export_all).
 
--define(Count, 160).
+-define(M, 160).
 
 start(NumNodes, NumRequests) ->
     PIDS = spawn_many(numNodes, max),
@@ -16,7 +16,7 @@ build_chord(Remaining, Joined) ->
     KnownNode = {KnownNodeID, KnownNodePID},
     NodePID =  lists:nth(1, Remaining),
     NodePID ! {KnownNode},
-    timer:sleep(100),
+    timer:sleep(1000),
     build_chord(lists:delete(NodePID, Remaining), Joined ++ [NodePID]).
 
 spawn_many(0) ->
@@ -33,7 +33,7 @@ create_chord() ->
     PID = self(),
     N = {Id, PID},
     {Predecessor, Successor} = create(N),
-    Finger = fix_fingers(N, Count), %TODO: Change, define count
+    Finger = lists:duplicate(?M, Successor),
     run(N, Successor, Predecessor, Finger).
 
 join_chord() ->
@@ -43,42 +43,69 @@ join_chord() ->
     receive
         {KnownNode} ->
             {Predecessor, Successor} = join(N, KnownNode),
-            Finger = fix_fingers(N, Count), %TODO: Change, define count
+            Finger = lists:duplicate(?M, Successor),
             run(N, Successor, Predecessor, Finger)
     end.
 
 run(SelfNode, Successor, Predecessor, Finger) ->
-    spawn(main, update, [SelfNode, Successor, Predecessor, Finger]),
-    run_loop(SelfNode, Successor, Predecessor, Finger).
+    Updater = spawn(main, update, [SelfNode, Successor, Predecessor, Finger, 1]),
+    run_loop(SelfNode, Successor, Predecessor, Finger, Updater).
 
-run_loop(SelfNode, Successor, Predecessor, Finger) ->
+run_loop(SelfNode, Successor, Predecessor, Finger, Updater) ->
     receive
         {fix_fingers, NewFinger} ->
-            run_loop(SelfNode, Successor, Predecessor, NewFinger);
+            run_loop(SelfNode, Successor, Predecessor, NewFinger, Updater);
         {update, NewSuccessor} ->
-            run_loop(SelfNode, NewSuccessor, Predecessor, Finger);
+            run_loop(SelfNode, NewSuccessor, Predecessor, Finger, Updater);
         {findsuccessor, Id, ReqN} ->
             find_successor(Id, ReqN, SelfNode, Successor, Finger),
-            run_loop(SelfNode, Successor, Predecessor, Finger);
+            run_loop(SelfNode, Successor, Predecessor, Finger, Updater);
         {predecessor, ReqPID} ->
             ReqPID ! {Predecessor},
-            run_loop(SelfNode, Successor, Predecessor, Finger);
+            run_loop(SelfNode, Successor, Predecessor, Finger, Updater);
         {notify, PossiblePredecessor} ->
             NewPredecessor =  notify(SelfNode, PossiblePredecessor, Predecessor),
-            run_loop(SelfNode, Successor, NewPredecessor, Finger)
-        % {stillWorking} ->
-
+            Updater ! {newpredecessor, NewPredecessor},
+            run_loop(SelfNode, Successor, NewPredecessor, Finger, Updater);
+        {stillWorking, Req} ->
+            Req ! {yes},
+            run_loop(SelfNode, Successor, Predecessor, Finger, Updater);
+        {predDead} ->
+            NewPredecessor = {nil, nil},
+            Updater ! {newpredecessor, NewPredecessor},
+            run_loop(SelfNode, Successor, NewPredecessor, Finger, Updater)
     end.
 
 % Runs update in background for ever node. Each node has a thread (actor)
 % Updating its successor and its Finger table.
-update(SelfNode, Successor, Predecessor, Finger) ->
+update(SelfNode, Successor, Predecessor, Finger, Count) ->
     NewSuccessor = stabilize(SelfNode, Successor),
     {SelfID, SelfPID} = SelfNode,
     SelfPID ! {update, NewSuccessor},
-    NewFinger = fix_fingers(), %TODO: Change.
+    {NewFinger, Next} = fix_fingers(SelfNode, Count, Finger),
     SelfPID ! {fix_fingers, NewFinger},
-    timer:sleep(100).
+    receive
+        {newpredecessor, NewPredecessor} ->
+            ok
+    after
+        0 ->
+            NewPredecessor = Predecessor
+    end,
+    {PredecessorID, PredecessorPID} = NewPredecessor,
+    PredExist = (PredecessorID /= nil),
+    if PredExist ->
+        Status = check_predecessor(Predecessor),
+        Bool = (Status == ok),
+        if Bool ->
+            ok;
+        true ->
+            SelfNode ! {predDead}
+        end;
+    true ->
+        ok
+    end,
+    timer:sleep(100),
+    update(SelfNode, NewSuccessor, NewPredecessor, NewFinger, Next).
 
 %n.find successor(id)
 % Finger is a list of {Id, PID} tuples
@@ -162,27 +189,32 @@ notify(Node, PossiblePredecessor, Predecessor) ->
     NewPredecessor.
 
 %fix_fingers - periodically refresh finger table entries
-
-fix_fingers(Node, Count) ->
-    if (Count > M) ->
+fix_fingers(Node, Count, Finger) ->
+    Bool = (Count+1) > ?M,
+    if Bool ->
         New_Count = 1;
     true ->
-        New_Count = Count,
-    New_Count = Count - 1,
-    lists:nth(New_Count, Finger)  = find_successor(Node + (math:pow(2, (New_Count - 1)))),
-    fix_fingers(Node, New_Count - 1).
-    
+        New_Count = Count + 1
+    end,
+    {NodeID, NodePID} = Node,
+    NodePID ! {findsuccessor, (NodeID + (math:pow(2, (New_Count - 1)))), NodePID},
+    receive
+        {Successor} ->
+            ok
+    end,
+    NewFinger = lists:sublist(Finger,Count-1) ++  [Successor] ++ lists:nthtail(Count,Finger),
+    {NewFinger, Count}.
 
 % called periodically. checks whether predecessor has failed.
 check_predecessor(Predecessor) ->
-    Predecessor ! {stillWorking},
+    Predecessor ! {stillWorking, self()},
     receive
         {yes} ->
             ok
     after 
-        10000 ->
+        500 ->
             io:fwrite("Failure: No response from predecessor\n"),
-            Predecessor = nil
+            dead
     end.
 
 

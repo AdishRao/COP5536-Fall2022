@@ -33,7 +33,7 @@ build_chord(Remaining, Joined) ->
     KnownNode = {KnownNodeID, KnownNodePID},
     NodePID =  lists:nth(1, Remaining),
     NodePID ! {KnownNode},
-    timer:sleep(10000),
+    timer:sleep(5000),
     build_chord(lists:delete(NodePID, Remaining), Joined ++ [NodePID]).
 
 spawn_many(0, _, _) ->
@@ -59,7 +59,6 @@ join_chord(NumRequests, NumNodes) ->
     N = {Id, PID},
     receive
         {KnownNode} ->
-            %io:fwrite("Known node ~p\n", [KnownNode]),
             {Predecessor, Successor} = join(N, KnownNode),
             Finger = lists:duplicate(?M, Successor),
             run(N, Successor, Predecessor, Finger, NumRequests, NumNodes)
@@ -116,18 +115,14 @@ makerequest(SelfNode, NumRequests, NumNodes) ->
     timer:sleep(1000),
     {_, SelfPID} = SelfNode,
     Id = rand:uniform(trunc(?maxval)),
-    %io:fwrite("************ SEARCHING FOR ~p\n", [Id]),
     SelfPID ! {findsuccessor, Id, self(), -1},
     receive
         {successor_found, _, JumpCount} ->
             server ! {JumpCount}
-    % after
-    %     10000 ->
-    %         server ! {math:log2(NumNodes)}
     end,
     makerequest(SelfNode, NumRequests - 1, NumNodes).
 makerequest(SelfNode, NumRequests, NumNodes, wait) ->
-    timer:sleep(NumNodes*10000 + 120000),
+    timer:sleep(NumNodes*500 + 120000),
     makerequest(SelfNode, NumRequests, NumNodes).
 
 % Runs update in background for ever node. Each node has a thread (actor)
@@ -140,7 +135,6 @@ update(SelfNode, Successor, Predecessor, Finger, Count) ->
     true ->
         ok
     end,
-    % {NewFinger, Next} = fix_fingers(SelfNode, Count, Finger),
     NewFinger = fix_fingers(SelfNode, ?M, RetFinger),
     SelfPID ! {fix_fingers, NewFinger},
     receive
@@ -291,23 +285,6 @@ notify(Node, PossiblePredecessor, Predecessor) ->
     end,
     NewPredecessor.
 
-%fix_fingers - periodically refresh finger table entries
-% fix_fingers(Node, Count, Finger) ->
-%     Bool = (Count-1) == 0,
-%     if Bool ->
-%         New_Count = ?M;
-%     true ->
-%         New_Count = Count - 1
-%     end,
-%     {NodeID, NodePID} = Node,
-%     NodePID ! {findsuccessor, (trunc(NodeID + math:pow(2, (New_Count - 1))) rem trunc(?maxval)), self(), 0},
-%     receive
-%         {successor_found, Successor, _} ->
-%             ok
-%     end,
-%     NewFinger = lists:sublist(Finger,New_Count-1) ++  [Successor] ++ lists:nthtail(New_Count,Finger),
-%     {NewFinger, New_Count}.
-
 fix_fingers(_, 0, Finger) ->
     Finger;
 fix_fingers(Node, Count, Finger) ->
@@ -323,7 +300,6 @@ fix_fingers(Node, Count, Finger) ->
     end,
     NewFinger = fix_fingers(Node, Count - 1, lists:sublist(Finger,Count-1) ++  [Successor] ++ lists:nthtail(Count,Finger)),
     NewFinger.
-
 
 % called periodically. checks whether predecessor has failed.
 check_predecessor(Predecessor) ->

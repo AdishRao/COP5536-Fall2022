@@ -130,11 +130,23 @@ start(LoggedIn, Threads) ->
         {server_query, Username, Tweet, TweetId, Tweeter} ->
             case dict:find(Username, LoggedIn) of
                 {ok, ClientPid} ->
-                        ClientPid ! {query_response, Username, Tweet, TweetId, Tweeter};
+                        ClientPid ! {query_response, Tweet, TweetId, Tweeter};
                 error ->
                     ok
             end,
-            start(LoggedIn, Threads)
+            start(LoggedIn, Threads);
+
+        % Client wants to retweet. Response in server_tweet
+        {client_retweet, Username, Tweet, Tweeter} ->
+            if (length(Threads) == 10) ->
+                Pid2 = server_wait(),
+                NewThreads = lists:delete(Pid2, Threads);
+            true ->
+                NewThreads = Threads
+            end,
+            SpawnThread = spawn(server, retweet, [Username, Tweet, Tweeter]),
+            monitor(process, SpawnThread),
+            start(LoggedIn, NewThreads ++ [SpawnThread])
     end.
 
 % Server is waiting for a thread to finish
@@ -304,7 +316,7 @@ send_tweets(Tweet, FinalUsers, LoggedIn, Username, TweetId) ->
     UserString = binary_to_list(lists:nth(1, User)),
     case dict:find(UserString, LoggedIn) of
         {ok, ClientPid} ->
-            ClientPid ! {new_tweet, Tweet, Username, TweetId};
+            ClientPid ! {new_tweet, Tweet, Username, TweetId}; % Username is the user who made the tweet
         error ->
             ok
     end,
@@ -428,3 +440,7 @@ query_tweets(Username, Name) ->
     end,
     mysql:stop(Pid),
     exit(thread_complete).
+
+retweet(Username, Tweet, Tweeter) ->
+    NewTweet = string:concat(string:concat(Tweeter, "said : \""), string:concat(Tweet, "\"")),
+    client_tweet(Username, NewTweet).

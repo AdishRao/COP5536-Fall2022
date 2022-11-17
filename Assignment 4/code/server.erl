@@ -41,7 +41,7 @@ start(LoggedIn, Threads) ->
                 ClientPid ! {register_response, error},
                 NewLoggedIn = LoggedIn;
             true ->
-                ClientPid ! {register_response, ok},
+                ClientPid ! {register_response, Username, ok},
                 monitor(process, ClientPid),
                 NewLoggedIn = dict:store(Username, ClientPid, LoggedIn),
                 put(ClientPid, Username)
@@ -67,7 +67,7 @@ start(LoggedIn, Threads) ->
                 ClientPid ! {login_response, error},
                 NewLoggedIn = LoggedIn;
             true ->
-                ClientPid ! {login_response, ok},
+                ClientPid ! {login_response, Username, ok},
                 monitor(process, ClientPid),
                 NewLoggedIn = dict:store(Username, ClientPid, LoggedIn),
                 put(ClientPid, Username)
@@ -132,7 +132,7 @@ start(LoggedIn, Threads) ->
                 {ok, ClientPid} ->
                         ClientPid ! {query_response, Tweet, TweetId, Tweeter};
                 error ->
-                    ok  % Shouldn't this send a message to Client?
+                    ok  
             end,
             start(LoggedIn, Threads);
 

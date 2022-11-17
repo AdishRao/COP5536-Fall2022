@@ -132,7 +132,7 @@ start(LoggedIn, Threads) ->
                 {ok, ClientPid} ->
                         ClientPid ! {query_response, Tweet, TweetId, Tweeter};
                 error ->
-                    ok
+                    ok  % Shouldn't this send a message to Client?
             end,
             start(LoggedIn, Threads);
 

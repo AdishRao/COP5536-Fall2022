@@ -28,7 +28,7 @@ start_listening() ->
         {new_tweet, Tweet, Tweeter, TweetId} ->
             io:fwrite("New Tweet | Tweet\t~p\n, Tweeter \t~p\n, TweetID\t~p\n", [Tweet, Tweeter, TweetId])
     end,
-    start_listening.
+    start_listening().
 
 start_listening(Server_node) ->
     receive

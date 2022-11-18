@@ -6,80 +6,96 @@
 
 start(Server_node) ->
     net_adm:ping(Server_node),
-    {ok, New_or_Current_User} = io:read("Login or Register: "),
-    Pattern = "login",
-    if New_or_Current_User == Pattern->
-        io:fwrite("Inside login if"),
+    New_or_Current_User = string:chomp(io:get_line("Login or Register: ")),
+    if New_or_Current_User == "login" ->
+        io:fwrite("Inside login if\n"),
         login(Server_node);
     true ->
-        io:fwrite("Inside else"),
+        io:fwrite("Inside else\n"),
         register(Server_node)  
     end,
     start_listening(Server_node).
     
 
-start_listening(Server_node) ->
+start_listening() ->
     receive
         {tweet_response, error} ->
             io:fwrite("Error tweeting");
         {tweet_response, ok} ->
             io:fwrite("Tweet successful");
         {query_response, Tweet, TweetId, Tweeter} ->
-            io:swrite("Query Response | Tweet, TweetID, Tweeter : \n", [Tweet, TweetId, Tweeter]);
+            io:fwrite("Query Response | Tweet\t~p\n, Tweeter \t~p\n, TweetID\t~p\n", [Tweet, Tweeter, TweetId]);
+        {new_tweet, Tweet, Tweeter, TweetId} ->
+            io:fwrite("New Tweet | Tweet\t~p\n, Tweeter \t~p\n, TweetID\t~p\n", [Tweet, Tweeter, TweetId])
+    end.
+start_listening(Server_node) ->
+    receive
+        {login_response, Username, ok} ->
+            io:fwrite("Login Successful\n"),
+            io:fwrite("Welcome back!\n"),
+            spawn_link(client, start_tweeting, [Server_node, Username]),
+            start_listening();
+        {register_response, Username, ok} ->
+            io:fwrite("Registration Successful"),
+            io:fwrite("Welcome to Twitter!"),
+            spawn_link(client, start_tweeting, [Server_node, Username]),
+            start_listening();
         {login_response, error} ->
             io:fwrite("Login Error"),
             start(Server_node);
         {register_response, error} ->
             io:fwrite("Registration error"),
-            start(Server_node);
-        {login_response, Username, ok} ->
-            io:fwrite("Login Successful"),
-            io:fwrite("Welcome back!"),
-            start_tweeting(Server_node, Username);
-        {register_response, Username, ok} ->
-            io:fwrite("Registration Successful"),
-            io:fwrite("Welcome to Twitter!"),
-            start_tweeting(Server_node, Username)
+            start(Server_node)
     end.
 
 start_tweeting(Server_node, Username) ->
-    %To be put in a while loop 
-    {ok, Operation} = io:read("You can now tweet, query, subscribe or retweet.
-                                What would you like to do?"),
+    Operation = string:chomp(io:get_line("You can now tweet, query, subscribe or retweet. What would you like to do?\n")),
     case Operation of 
-        tweet -> tweet(Server_node, Username);
-        subscribe -> subscribe(Server_node, Username);
-        query -> query(Server_node, Username);
-        retweet -> retweet(Server_node, Username)
-    end.
+        "tweet" -> tweet(Server_node, Username);
+        "subscribe" -> subscribe(Server_node, Username);
+        "query" -> query(Server_node, Username);
+        "retweet" -> retweet(Server_node, Username)
+    end,
+    start_tweeting(Server_node, Username).
 
-% Capital letter input causes error
 register(Server_node) ->
-    {ok, Username} = io:read("Enter Username: "),
-    {ok, Password} = io:read("Enter Password: "),
+    Username = string:chomp(io:get_line("Enter Username: ")),
+    Password = string:chomp(io:get_line("Enter Password: ")),
     {server, Server_node} ! {client_register, self(), Username, Password}.
     
 login(Server_node)->
-    {ok, Username} = io:read("Enter Username: "),
-    % io:format("~w~n",[Username]),
-    {ok, Password} = io:read("Enter Password: "),
-    % io:format("~w~n",[Password]),
+    Username = string:chomp(io:get_line("Enter Username: ")),
+    Password = string:chomp(io:get_line("Enter Password: ")),
     {server, Server_node}  ! {client_login, self(), Username, Password}.
 
 tweet(Server_node, Username) ->
-    {ok, Tweet} = io:read("What would you like to say? "),
+    Tweet = string:chomp(io:get_line("What would you like to say? ")),
     {server, Server_node}  ! {client_tweet, Username, Tweet}.
 
 subscribe(Server_node, Username) ->
-    New_subscription = io:read("What are you subscribing to? "),
+    New_subscription_raw = string:chomp(io:get_line("What are you subscribing to? ")),
+    New_subscription = process_string(New_subscription_raw),
     {server, Server_node}  ! {client_subscribe_to, Username, New_subscription}.
 
 query(Server_node, Username)->
-    Query = io:read("What/Whom do you want to know more about? "),
+    Query_raw = string:chomp(io:get_line("What/Whom do you want to know more about? ")),
+    Query = process_string(Query_raw),
     {server, Server_node}  ! {client_query, Username, Query}.
 
+process_string(String) ->
+    case string:prefix(String, "#") of
+        nomatch ->
+            case string:prefix(String, "@") of
+                nomatch ->
+                    ReturnString = String;
+                StringWithoutMention ->
+                    ReturnString =  string:concat("mention_", StringWithoutMention)
+            end;
+        StringWithoutHash ->
+            ReturnString =  string:concat("hash_", StringWithoutHash)
+    end,
+    ReturnString.
+
 retweet(Server_node, Username)->
-    {ok, Tweet, Tweeter} = io:read("Enter the tweet and the tweeter's name whom you'd like to retweet"),
-    {server, Server_node}  ! {client_retweet, Username, Tweet, Tweeter}.
-    
-        
+    {ok, TweetId} = io:read("Enter the tweet id you'd like to retweet"),
+    {server, Server_node} ! {client_retweet, Username, TweetId}.

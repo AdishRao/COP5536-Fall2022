@@ -16,7 +16,6 @@ start(LoggedIn, Threads) ->
             NewThreads = lists:delete(Pid2, Threads),
             start(LoggedIn, NewThreads);
 
-        % TODO: Handle user logged out
         {'DOWN', _, process, Pid2, _} ->
             Username = get(Pid2),
             erase(Pid2),
@@ -136,14 +135,14 @@ start(LoggedIn, Threads) ->
             start(LoggedIn, Threads);
 
         % Client wants to retweet. Response in server_tweet
-        {client_retweet, Username, Tweet, Tweeter} ->
+        {client_retweet, Username, TweetId} ->
             if (length(Threads) == 10) ->
                 Pid2 = server_wait(),
                 NewThreads = lists:delete(Pid2, Threads);
             true ->
                 NewThreads = Threads
             end,
-            SpawnThread = spawn(server, retweet, [Username, Tweet, Tweeter]),
+            SpawnThread = spawn(server, retweet, [Username, TweetId]),
             monitor(process, SpawnThread),
             start(LoggedIn, NewThreads ++ [SpawnThread])
     end.
@@ -440,6 +439,17 @@ query_tweets(Username, Name) ->
     mysql:stop(Pid),
     exit(thread_complete).
 
-retweet(Username, Tweet, Tweeter) ->
-    NewTweet = string:concat(string:concat(Tweeter, " said : \""), string:concat(Tweet, "\"")),
-    client_tweet(Username, NewTweet).
+retweet(Username, TweetId) ->
+    {ok, Pid} = mysql:start_link([{host, "localhost"}, {user, "root"}, {database, "twitter"}]),
+    SelectQuery = "SELECT (username, tweet) FROM Tweets WHERE tweet_id = (?)",
+    {ok, _, SelectRes} = mysql:query(Pid, SelectQuery, [TweetId]),
+    mysql:stop(Pid),
+    if SelectRes == [] ->
+        {server_tweet, error, Username, error, error, error};
+    true ->
+        {Tweeter_raw, Tweet_raw} = lists:nth(1, lists:nth(1, SelectRes)),
+        Tweet = binary_to_list(Tweet_raw),
+        Tweeter = binary_to_list(Tweeter_raw),
+        NewTweet = string:concat(string:concat(Tweeter, " said : \""), string:concat(Tweet, "\"")),
+        client_tweet(Username, NewTweet)
+    end.

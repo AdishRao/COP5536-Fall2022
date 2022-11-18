@@ -27,7 +27,9 @@ start_listening() ->
             io:fwrite("Query Response | Tweet\t~p\n, Tweeter \t~p\n, TweetID\t~p\n", [Tweet, Tweeter, TweetId]);
         {new_tweet, Tweet, Tweeter, TweetId} ->
             io:fwrite("New Tweet | Tweet\t~p\n, Tweeter \t~p\n, TweetID\t~p\n", [Tweet, Tweeter, TweetId])
-    end.
+    end,
+    start_listening.
+
 start_listening(Server_node) ->
     receive
         {login_response, Username, ok} ->
@@ -36,8 +38,8 @@ start_listening(Server_node) ->
             spawn_link(client, start_tweeting, [Server_node, Username]),
             start_listening();
         {register_response, Username, ok} ->
-            io:fwrite("Registration Successful"),
-            io:fwrite("Welcome to Twitter!"),
+            io:fwrite("Registration Successful\n"),
+            io:fwrite("Welcome to Twitter!\n"),
             spawn_link(client, start_tweeting, [Server_node, Username]),
             start_listening();
         {login_response, error} ->
@@ -66,6 +68,7 @@ register(Server_node) ->
 login(Server_node)->
     Username = string:chomp(io:get_line("Enter Username: ")),
     Password = string:chomp(io:get_line("Enter Password: ")),
+    io:fwrite("Username: ~p and Password ~p\n",[Username, Password]),
     {server, Server_node}  ! {client_login, self(), Username, Password}.
 
 tweet(Server_node, Username) ->

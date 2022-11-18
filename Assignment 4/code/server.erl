@@ -24,6 +24,7 @@ start(LoggedIn, Threads) ->
 
         % Client Request To Register a user
         {client_register, ClientPid, Username, Password} ->
+            io:fwrite("recieved client_register\n"),
             if (length(Threads) == 10) ->
                 Pid2 = server_wait(),
                 NewThreads = lists:delete(Pid2, Threads);
@@ -36,6 +37,7 @@ start(LoggedIn, Threads) ->
 
         % Server thread response to register request
         {server_register, Status, Username, ClientPid} ->
+            io:fwrite("recieved server_register\n"),
             if Status == error ->
                 ClientPid ! {register_response, error},
                 NewLoggedIn = LoggedIn;
@@ -49,6 +51,7 @@ start(LoggedIn, Threads) ->
 
         % Client Login Request
         {client_login, ClientPid, Username, Password} ->
+            io:fwrite("recieved client_login\n"),
             if (length(Threads) == 10) ->
                 Pid2 = server_wait(),
                 NewThreads = lists:delete(Pid2, Threads);
@@ -61,6 +64,7 @@ start(LoggedIn, Threads) ->
 
         % Server thread response to Login Request
         {server_login, Status, Username, ClientPid} ->
+            io:fwrite("recieved server_login\n"),
             if Status == error ->
                 ClientPid ! {login_response, error},
                 NewLoggedIn = LoggedIn;
@@ -75,6 +79,7 @@ start(LoggedIn, Threads) ->
 
         % Client Tweet Request
         {client_tweet, Username, Tweet} ->
+            io:fwrite("recieved client_tweet\n"),
             if (length(Threads) == 10) ->
                 Pid2 = server_wait(),
                 NewThreads = lists:delete(Pid2, Threads);
@@ -87,6 +92,7 @@ start(LoggedIn, Threads) ->
 
         % Server response to Tweet Request
         {server_tweet, Status, Username, FinalUsers, Tweet, TweetId} ->
+            io:fwrite("recieved server_tweet\n"),
             case dict:find(Username, LoggedIn) of
                 {ok, ClientPid} ->
                     if Status == error ->
@@ -102,6 +108,7 @@ start(LoggedIn, Threads) ->
 
         % Client wants to subscribe to something
         {client_subscribe_to, Username, Name} ->
+            io:fwrite("recieved client_subscribe_to\n"),
             if (length(Threads) == 10) ->
                 Pid2 = server_wait(),
                 NewThreads = lists:delete(Pid2, Threads);
@@ -114,6 +121,7 @@ start(LoggedIn, Threads) ->
 
         % Client wants to query to something
         {client_query, Username, Name} ->
+            io:fwrite("recieved client_query\n"),
             if (length(Threads) == 10) ->
                 Pid2 = server_wait(),
                 NewThreads = lists:delete(Pid2, Threads);
@@ -126,6 +134,7 @@ start(LoggedIn, Threads) ->
 
         % Server response to client query to something
         {server_query, Username, Tweet, TweetId, Tweeter} ->
+            io:fwrite("recieved server_query\n"),
             case dict:find(Username, LoggedIn) of
                 {ok, ClientPid} ->
                         ClientPid ! {query_response, Tweet, TweetId, Tweeter};
@@ -136,6 +145,7 @@ start(LoggedIn, Threads) ->
 
         % Client wants to retweet. Response in server_tweet
         {client_retweet, Username, TweetId} ->
+            io:fwrite("recieved client_retweet\n"),
             if (length(Threads) == 10) ->
                 Pid2 = server_wait(),
                 NewThreads = lists:delete(Pid2, Threads);
@@ -186,18 +196,17 @@ login_user(ClientPid, Username, Password) ->
     if length(Res0) == 0 ->
         server ! {server_login, error, Username, ClientPid};
     true ->
-        ok
-    end,
-    {ok, _, StoredPasswordList} = mysql:query(Pid, "SELECT password from Users WHERE username = ?;", [Username]),
-    if length(StoredPasswordList) == 0 ->
-        server ! {server_login, error, Username, ClientPid};
-    true ->
-        StoredPassword = lists:nth(1, lists:nth(1, StoredPasswordList)),
-        StringStoredPassword = binary_to_list(StoredPassword),
-        if StringStoredPassword == Password ->
-            server ! {server_login, ok, Username, ClientPid};
+        {ok, _, StoredPasswordList} = mysql:query(Pid, "SELECT password from Users WHERE username = ?;", [Username]),
+        if length(StoredPasswordList) == 0 ->
+            server ! {server_login, error, Username, ClientPid};
         true ->
-            server ! {server_login, error, Username, ClientPid}
+            StoredPassword = lists:nth(1, lists:nth(1, StoredPasswordList)),
+            StringStoredPassword = binary_to_list(StoredPassword),
+            if StringStoredPassword == Password ->
+                server ! {server_login, ok, Username, ClientPid};
+            true ->
+                server ! {server_login, error, Username, ClientPid}
+            end
         end
     end,
     mysql:stop(Pid),

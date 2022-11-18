@@ -433,7 +433,7 @@ query_tweets(Username, Name) ->
             MatchMention = true
     end,
     if (MatchMention == false) and (MatchHash == false) ->
-        SelectQuery2 = "SELECT (tweet, tweet_id) FROM Tweets WHERE username = (?) ORDER BY tweet_id DESC LIMIT 1",
+        SelectQuery2 = "SELECT tweet, tweet_id FROM Tweets WHERE username = (?) ORDER BY tweet_id DESC LIMIT 1",
         {ok, _, SelectRes4} = mysql:query(Pid, SelectQuery2, [Name]),
         if SelectRes4 == [] ->
             server ! {server_query, error, error, error, error};
@@ -450,7 +450,7 @@ query_tweets(Username, Name) ->
 
 retweet(Username, TweetId) ->
     {ok, Pid} = mysql:start_link([{host, "localhost"}, {user, "root"}, {database, "twitter"}]),
-    SelectQuery = "SELECT (username, tweet) FROM Tweets WHERE tweet_id = (?)",
+    SelectQuery = "SELECT username, tweet FROM Tweets WHERE tweet_id = (?)",
     {ok, _, SelectRes} = mysql:query(Pid, SelectQuery, [TweetId]),
     mysql:stop(Pid),
     if SelectRes == [] ->

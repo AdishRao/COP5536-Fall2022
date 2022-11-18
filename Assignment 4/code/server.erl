@@ -61,7 +61,6 @@ start(LoggedIn, Threads) ->
             start(LoggedIn, NewThreads ++ [SpawnThread]);
 
         % Server thread response to Login Request
-        % TODO: Search DB for all following and last tweet recieved.
         {server_login, Status, Username, ClientPid} ->
             if Status == error ->
                 ClientPid ! {login_response, error},
@@ -384,12 +383,12 @@ query_tweets(Username, Name) ->
             ShowQuery = string:concat(string:concat("SHOW TABLES LIKE '", Name), "';"),
             {ok, _, Res0} = mysql:query(Pid, ShowQuery),
             if length(Res0) == 0 ->
-                ok;
+                server ! {server_query, error, error, error, error};
             true ->
                 SelectQuery = string:concat(string:concat("SELECT * FROM ", Name), " ORDER BY tweet_id DESC LIMIT 1;"),
                 {ok, _, SelectRes} = mysql:query(Pid, SelectQuery),
                 if SelectRes == [] ->
-                    ok;
+                    server ! {server_query, error, error, error, error};
                 true ->
                     TweetId = lists:nth(1, lists:nth(1, SelectRes)),
                     {ok, _, SelectRes1} = mysql:query(Pid, "SELECT username, tweet FROM Tweets WHERE tweet_id = ?",[TweetId]),
@@ -408,12 +407,12 @@ query_tweets(Username, Name) ->
             ShowQuery1 = string:concat(string:concat("SHOW TABLES LIKE '", Name), "';"),
             {ok, _, Res1} = mysql:query(Pid, ShowQuery1),
             if length(Res1) == 0 ->
-                ok;
+                server ! {server_query, error, error, error, error};
             true ->
                 SelectQuery1 = string:concat(string:concat("SELECT * FROM ", Name), " ORDER BY tweet_id DESC LIMIT 1;"),
                 {ok, _, SelectRes2} = mysql:query(Pid, SelectQuery1),
                 if SelectRes2 == [] ->
-                    ok;
+                    server ! {server_query, error, error, error, error};
                 true ->
                     TweetId1 = lists:nth(1, lists:nth(1, SelectRes2)),
                     {ok, _, SelectRes3} = mysql:query(Pid, "SELECT username, tweet FROM Tweets WHERE tweet_id = ?",[TweetId1]),
@@ -429,7 +428,7 @@ query_tweets(Username, Name) ->
         SelectQuery2 = "SELECT (tweet, tweet_id) FROM Tweets WHERE username = (?) ORDER BY tweet_id DESC LIMIT 1",
         {ok, _, SelectRes4} = mysql:query(Pid, SelectQuery2, [Name]),
         if SelectRes4 == [] ->
-                    ok;
+            server ! {server_query, error, error, error, error};
         true ->
             {Tweet2, TweetId2} = lists:nth(1, lists:nth(1, SelectRes4)),
             TweetString2 = binary_to_list(Tweet2),
@@ -442,5 +441,5 @@ query_tweets(Username, Name) ->
     exit(thread_complete).
 
 retweet(Username, Tweet, Tweeter) ->
-    NewTweet = string:concat(string:concat(Tweeter, "said : \""), string:concat(Tweet, "\"")),
+    NewTweet = string:concat(string:concat(Tweeter, " said : \""), string:concat(Tweet, "\"")),
     client_tweet(Username, NewTweet).

@@ -456,7 +456,7 @@ retweet(Username, TweetId) ->
     if SelectRes == [] ->
         {server_tweet, error, Username, error, error, error};
     true ->
-        {Tweeter_raw, Tweet_raw} = lists:nth(1, lists:nth(1, SelectRes)),
+        [Tweeter_raw, Tweet_raw] = lists:nth(1, SelectRes),
         Tweet = binary_to_list(Tweet_raw),
         Tweeter = binary_to_list(Tweeter_raw),
         NewTweet = string:concat(string:concat(Tweeter, " said : \""), string:concat(Tweet, "\"")),

@@ -29,7 +29,7 @@ start_listening() ->
         {new_tweet, _, _, TweetId} ->
             Prob = rand:uniform(),
             ZipProb = zipf(get(username)),
-            if Prob =< (0.2 + 2*ZipProb) ->
+            if Prob =< (0.2 + ZipProb) ->
                 retweet(get(server), get(username), TweetId);
             true ->
                 ok
@@ -51,7 +51,7 @@ start_listening(Server_node) ->
 start_tweeting_setup(Server_node, Username, MaxUsers) ->
     put(max, MaxUsers),
     timer:sleep(1000),
-    Num_Subs = zipf(Username)*get(max),
+    Num_Subs = ceil(zipf(Username)*get(max)),
     subscribe_loop(Server_node, Username, Num_Subs),
     start_tweeting(Server_node, Username).
 
@@ -91,7 +91,7 @@ zipf(Username)->
     Num = (1/list_to_integer(Username)),
     Den = math:log(get(max)) + 0.5772156649,
     Zipf = (Num/Den),
-    round(Zipf).
+    Zipf.
 
 generate_random_string() ->
     Base64_string =

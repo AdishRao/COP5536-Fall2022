@@ -184,7 +184,7 @@ register_user(ClientPid, Username, Password) ->
     {ok, Pid} = mysql:start_link([{host, "localhost"}, {user, "root"}, {database, "twitter"}]),
     {ok, _, Res0} = mysql:query(Pid, "SHOW TABLES LIKE 'Users';"),
     if length(Res0) == 0 ->
-        ok = mysql:query(Pid, "CREATE TABLE Users (
+        ok = mysql:query(Pid, "CREATE TABLE IF NOT EXISTS Users (
             username varchar(255) UNIQUE,
             password varchar(255)
         );");
@@ -196,8 +196,8 @@ register_user(ClientPid, Username, Password) ->
         server ! {server_register, ok, Username, ClientPid},
         UsernameSub = string:concat(Username, "_subscribers"),
         UsernameTo = string:concat(Username, "_subscribed_to"),
-        UsernameSubQuery = string:concat(string:concat("CREATE TABLE ", UsernameSub), " (username varchar(255) UNIQUE);"),
-        UsernameToQuery = string:concat(string:concat("CREATE TABLE ", UsernameTo), " (name varchar(255) UNIQUE, tweet_id INT);"),
+        UsernameSubQuery = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", UsernameSub), " (username varchar(255) UNIQUE);"),
+        UsernameToQuery = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", UsernameTo), " (name varchar(255) UNIQUE, tweet_id INT);"),
         ok = mysql:query(Pid, UsernameSubQuery),
         ok = mysql:query(Pid, UsernameToQuery);
     true ->
@@ -232,7 +232,7 @@ client_tweet(Username, Tweet) ->
     {ok, Pid} = mysql:start_link([{host, "localhost"}, {user, "root"}, {database, "twitter"}]),
     {ok, _, Res0} = mysql:query(Pid, "SHOW TABLES LIKE 'Tweets';"),
     if length(Res0) == 0 ->
-        ok = mysql:query(Pid, "CREATE TABLE Tweets (
+        ok = mysql:query(Pid, "CREATE TABLE IF NOT EXISTS Tweets (
             tweet_id INT AUTO_INCREMENT,
             username varchar(255),
             tweet TEXT,
@@ -284,8 +284,8 @@ insert_into_hash_table(Tweet, TweetId, HashCaptured, Pid) ->
     ShowQuery = string:concat(string:concat("SHOW TABLES LIKE '", FinalString), "';"),
     {ok, _, Res0} = mysql:query(Pid, ShowQuery),
     if length(Res0) == 0 ->
-        FinalStringQuery = string:concat(string:concat("CREATE TABLE ", FinalString), " (tweet_id INT);"),
-        FinalStringUsersQuery = string:concat(string:concat("CREATE TABLE ", FinalStringUsers), " (username varchar(255) UNIQUE);"),
+        FinalStringQuery = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", FinalString), " (tweet_id INT);"),
+        FinalStringUsersQuery = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", FinalStringUsers), " (username varchar(255) UNIQUE);"),
         ok = mysql:query(Pid, FinalStringQuery),
         ok = mysql:query(Pid, FinalStringUsersQuery);
     true ->
@@ -314,8 +314,8 @@ insert_into_mention_table(Tweet, TweetId, MentionCaptured, Pid) ->
     ShowQuery = string:concat(string:concat("SHOW TABLES LIKE '", FinalString), "';"),
     {ok, _, Res0} = mysql:query(Pid, ShowQuery),
     if length(Res0) == 0 ->
-        FinalStringQuery = string:concat(string:concat("CREATE TABLE ", FinalString), " (tweet_id INT);"),
-        FinalStringUsersQuery = string:concat(string:concat("CREATE TABLE ", FinalStringUsers), " (username varchar(255) UNIQUE);"),
+        FinalStringQuery = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", FinalString), " (tweet_id INT);"),
+        FinalStringUsersQuery = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", FinalStringUsers), " (username varchar(255) UNIQUE);"),
         ok = mysql:query(Pid, FinalStringQuery),
         ok = mysql:query(Pid, FinalStringUsersQuery);
     true ->
@@ -354,8 +354,8 @@ subscribe_to(Username, Name) ->
             ShowQuery = string:concat(string:concat("SHOW TABLES LIKE '", Name), "';"),
             {ok, _, Res0} = mysql:query(Pid, ShowQuery),
             if length(Res0) == 0 ->
-                NameQuery = string:concat(string:concat("CREATE TABLE ", Name), " (tweet_id INT);"),
-                NameUsersQuery = string:concat(string:concat("CREATE TABLE ", string:concat(Name, "_users")), " (username varchar(255) UNIQUE);"),
+                NameQuery = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", Name), " (tweet_id INT);"),
+                NameUsersQuery = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", string:concat(Name, "_users")), " (username varchar(255) UNIQUE);"),
                 ok = mysql:query(Pid, NameQuery),
                 ok = mysql:query(Pid, NameUsersQuery);
             true ->
@@ -372,8 +372,8 @@ subscribe_to(Username, Name) ->
             ShowQuery1 = string:concat(string:concat("SHOW TABLES LIKE '", Name), "';"),
             {ok, _, Res1} = mysql:query(Pid, ShowQuery1),
             if length(Res1) == 0 ->
-                NameQuery1 = string:concat(string:concat("CREATE TABLE ", Name), " (tweet_id INT);"),
-                NameUsersQuery1 = string:concat(string:concat("CREATE TABLE ", string:concat(Name, "_users")), " (username varchar(255) UNIQUE);"),
+                NameQuery1 = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", Name), " (tweet_id INT);"),
+                NameUsersQuery1 = string:concat(string:concat("CREATE TABLE IF NOT EXISTS ", string:concat(Name, "_users")), " (username varchar(255) UNIQUE);"),
                 ok = mysql:query(Pid, NameQuery1),
                 ok = mysql:query(Pid, NameUsersQuery1);
             true ->

@@ -29,7 +29,7 @@ start_listening() ->
         {new_tweet, _, _, TweetId} ->
             Prob = rand:uniform(),
             ZipProb = zipf(get(username)),
-            if Prob =< (0.2 + ZipProb) ->
+            if Prob =< (0.1 + ZipProb) ->
                 retweet(get(server), get(username), TweetId);
             true ->
                 ok

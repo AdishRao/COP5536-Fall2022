@@ -169,6 +169,7 @@ start(LoggedIn, Threads) ->
             start(LoggedIn, Threads);
 
         {stop} ->
+            file:write_file("output.txt", io_lib:fwrite("~p", [get()])),
             io:fwrite("~p", [get()]),
             exit(ok)
     end.
@@ -335,6 +336,7 @@ insert_into_mention_table(Tweet, TweetId, MentionCaptured, Pid) ->
 send_tweets(_, [], _, _, _) ->
     ok;
 send_tweets(Tweet, FinalUsers, LoggedIn, Username, TweetId) ->
+    server ! {count_inc, Username},
     [User | Remainder] = FinalUsers,
     UserString = binary_to_list(lists:nth(1, User)),
     case dict:find(UserString, LoggedIn) of

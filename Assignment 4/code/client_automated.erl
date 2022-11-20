@@ -65,7 +65,7 @@ subscribe_loop(Server_node, Username, Num_Subs) ->
 start_tweeting(Server_node, Username) ->
     Prob = rand:uniform(),
     ZipProb = zipf(Username),
-    if Prob =< (0.2 + 3*ZipProb) ->
+    if Prob =< (0.4 + 3*ZipProb) ->
         tweet(Server_node, Username);
     true ->
         ok

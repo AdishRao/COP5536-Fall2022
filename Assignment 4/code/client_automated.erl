@@ -2,6 +2,7 @@
 
 -compile(export_all).
 
+-define(UseZipf, true).
 
 start(Server_node, NumUsers) ->
     start_spawning(Server_node, NumUsers, NumUsers).
@@ -28,7 +29,11 @@ start_listening() ->
             ok;
         {new_tweet, _, _, TweetId} ->
             Prob = rand:uniform(),
-            ZipProb = zipf(get(username)),
+            if ?UseZipf ->
+                ZipProb = zipf(get(username));
+            true ->
+                ZipProb = 0
+            end,
             if Prob =< (0.1 + ZipProb) ->
                 retweet(get(server), get(username), TweetId);
             true ->
@@ -51,7 +56,12 @@ start_listening(Server_node) ->
 start_tweeting_setup(Server_node, Username, MaxUsers) ->
     put(max, MaxUsers),
     timer:sleep(1000),
-    Num_Subs = ceil(zipf(Username)*get(max)),
+    if ?UseZipf ->
+        Num_Subs = ceil(zipf(Username)*get(max));
+    true ->
+        Max = get(max) div 4,
+        Num_Subs = rand:uniform(Max)
+    end,
     subscribe_loop(Server_node, Username, Num_Subs),
     start_tweeting(Server_node, Username).
 
@@ -64,7 +74,11 @@ subscribe_loop(Server_node, Username, Num_Subs) ->
 
 start_tweeting(Server_node, Username) ->
     Prob = rand:uniform(),
-    ZipProb = zipf(Username),
+    if ?UseZipf ->
+        ZipProb = zipf(Username);
+    true ->
+        ZipProb = 0
+    end,
     if Prob =< (0.4 + 3*ZipProb) ->
         tweet(Server_node, Username);
     true ->
